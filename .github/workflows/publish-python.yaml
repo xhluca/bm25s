@@ -1,0 +1,46 @@
+# This workflow will upload a Python Package using Twine when a release is created
+# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
+
+name: Publish Python Package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  bump-version-and-publish:
+    name: Bump version and upload release to PyPI
+
+    runs-on: ubuntu-latest
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
+    
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bm25s
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    
+    - name: Update version.py with release tag
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+      run: |
+        python .github/scripts/python/update_version.py --version $RELEASE_TAG --path "bm25s/version.py"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+    
+    - name: Build package
+      run: |
+        python setup.py sdist bdist_wheel
+    
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
