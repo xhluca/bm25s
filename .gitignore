@@ -124,6 +124,7 @@ celerybeat.pid
 .venv
 env/
 venv/
+venv-*/
 ENV/
 env.bak/
 venv.bak/
@@ -158,3 +159,24 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+/.rss
+venv/
+*.c
+*.so
+datasets/
+__pycache__/
+bm25s.prof
+tests/artifacts/
+results
+*.whl
+conda-env-*
+
+# Ignore elasticsearch
+elasticsearch-*.tar.gz
+elasticsearch-*/
+
+# inference benchmarks
+benchmark/inference/models/
+comparison_results
+bm25s_indices/

@@ -9,11 +9,13 @@ with open("README.md") as fp:
     long_description = fp.read()
 
 extras_require = {
-    "extra": ["PyStemmer", "tqdm"],
+    "core": ["jax[cpu]", "ujson", "tqdm", "PyStemmer"],
+    "stem": ["PyStemmer"],
+    "hf": ["huggingface_hub"],
     "dev": ["black"],
 }
-# Dynamically create the 'all' extra by combining all other extras
-extras_require["all"] = sum(extras_require.values(), [])
+# Dynamically create the 'full' extra by combining all other extras
+extras_require["full"] = sum(extras_require.values(), [])
 
 setup(
     name=package_name,
@@ -21,7 +23,7 @@ setup(
     author="Xing Han Lù",
     author_email=f"{package_name}@googlegroups.com",
     url=f"https://github.com/xhluca/{package_name}",
-    description="An ultra-fast implementation of BM25 based on sparse matrices",
+    description=f"An ultra-fast implementation of BM25 based on sparse matrices.",
     long_description=long_description,
     packages=find_packages(include=[f"{package_name}*"]),
     package_data={},
