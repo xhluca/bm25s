@@ -268,7 +268,7 @@ Here are some benchmarks comparing `bm25s` to other popular BM25 implementations
 
 ### Throughput (Queries per second)
 
-We compare the throughput of the BM25 implementations on various datasets. The throughput is measured in queries per second (QPS). For BM25S, we take the average of 10 runs.
+We compare the throughput of the BM25 implementations on various datasets. The throughput is measured in queries per second (QPS), on a single-threaded Intel Xeon CPU @ 2.70GHz (found on Kaggle). For BM25S, we take the average of 10 runs.
 
 | Dataset          |   BM25S | Elastic | BM25-PT | Rank-BM25 |
 | :--------------- | ------: | ------: | ------: | --------: |
@@ -287,6 +287,8 @@ We compare the throughput of the BM25 implementations on various datasets. The t
 | scifact          |  952.92 |   20.81 |   184.3 |      47.6 |
 | trec-covid       |   85.64 |    7.34 |    3.73 |      1.48 |
 | webis-touche2020 |   60.59 |   13.53 |     OOM |       1.1 |
+
+More detailed benchmarks can be found in the [bm25-benchmarks repo](https://github.com/xhluca/bm25-benchmarks).
 
 ### Disk usage
 
