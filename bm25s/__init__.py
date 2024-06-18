@@ -13,12 +13,19 @@ try:
     import ujson as json
 except ImportError:
     import json
-try:
-    from tqdm.auto import tqdm
-except ImportError:
 
-    def tqdm(iterable, *args, **kwargs):
-        return iterable
+
+def _faketqdm(iterable, *args, **kwargs):
+    return iterable
+
+if os.environ.get("DISABLE_TQDM", False):
+    tqdm = _faketqdm
+    # if can't import tqdm, use a fake tqdm
+else:
+    try:
+        from tqdm.auto import tqdm
+    except ImportError:
+        tqdm = _faketqdm
 
 
 from . import selection, utils, stopwords, scoring, tokenization
@@ -140,6 +147,7 @@ class BM25:
         self.idf_method = idf_method if idf_method is not None else method
         self.methods_requiring_nonoccurrence = ("bm25l", "bm25+")
         self.corpus = corpus
+        self._original_version = __version__
 
     @staticmethod
     def _infer_corpus_object(corpus):
@@ -412,6 +420,7 @@ class BM25:
         k: int = 10,
         sorted: bool = True,
         return_as: bool = "tuple",
+        show_progress: bool = True,
         leave_progress: bool = False,
         n_threads: int = 0,
         chunksize: int = 50,
@@ -449,6 +458,9 @@ class BM25:
             If return_as="documents", only the retrieved documents (or indices if `corpus`
             is not provided) will be returned.
 
+        show_progress : bool
+            If True, a progress bar will be shown. If False, no progress bar will be shown.
+        
         leave_progress : bool
             If True, the progress bars will remain after the function completes.
 
@@ -480,6 +492,7 @@ class BM25:
             "total": len(query_tokens),
             "desc": "BM25S Retrieve",
             "leave": leave_progress,
+            "disable": not show_progress,
         }
         topk_fn = partial(
             self._get_top_k_results, k=k, sorted=sorted, backend=backend_selection
@@ -604,6 +617,7 @@ class BM25:
             dtype=self.dtype,
             int_dtype=self.int_dtype,
             num_docs=self.scores["num_docs"],
+            version=__version__,
         )
         with open(params_path, "w") as f:
             json.dump(params, f, indent=4)
@@ -635,11 +649,10 @@ class BM25:
                         logging.warning(f"Error saving document at index {i}: {e}")
                     else:
                         f.write(doc + "\n")
-            
+
             # also save corpus.mmindex
             mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name)
             utils.corpus.save_mmindex(mmidx, path=save_dir / corpus_name)
-
 
     @classmethod
     def load(
@@ -701,14 +714,14 @@ class BM25:
         """
         if not isinstance(mmap, bool):
             raise ValueError("`mmap` must be a boolean")
-        
+
         # Load the BM25 index from the save_dir
         save_dir = Path(save_dir)
 
         # Load the parameters
         params_path = save_dir / params_name
         with open(params_path, "r") as f:
-            params = json.load(f)
+            params: dict = json.load(f)
 
         # Load the vocab dictionary
         vocab_path = save_dir / vocab_name
@@ -725,16 +738,20 @@ class BM25:
         indices = np.load(indices_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
         indptr = np.load(indptr_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
 
+        original_version = params.pop("version", None)
+
         scores = {
             "data": data,
             "indices": indices,
             "indptr": indptr,
-            "num_docs": params.pop("num_docs"),
+            "num_docs": params.pop("num_docs", None),
         }
+
 
         bm25_obj = cls(**params)
         bm25_obj.scores = scores
         bm25_obj.vocab_dict = vocab_dict
+        bm25_obj._original_version = original_version
 
         if load_corpus:
             # load the model from the snapshot
@@ -749,7 +766,7 @@ class BM25:
                         for line in f:
                             doc = json.loads(line)
                             corpus.append(doc)
-                    
+
                 bm25_obj.corpus = corpus
 
         # if the method is one of BM25L or BM25+, we need to load the non-occurrence array
