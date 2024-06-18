@@ -25,6 +25,8 @@ It is designed to be:
 
 Here's a comparison of `bm25s`'s speedup with respect to rank-bm25, compared to Elasticsearch (which uses BM25 behind the scene).
 
+To highlight the speedup, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25`, the most popular Python implementation of BM25. We measure the throughput in queries per second (QPS) on the `nfcorpus` dataset.
+
 ![comparison](assets/comparison.png)
 
 ## Installation
