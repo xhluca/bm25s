@@ -171,7 +171,7 @@ def tokenize(
         }
 
         # Now, we simply need to replace the tokens in the corpus with the stemmed tokens
-        for i, doc_ids in enumerate(tqdm(corpus_ids, desc="Stem Tokens", leave=leave)):
+        for i, doc_ids in enumerate(tqdm(corpus_ids, desc="Stem Tokens", leave=leave, disable=not show_progress)):
             corpus_ids[i] = [doc_id_to_stem_id[doc_id] for doc_id in doc_ids]
     else:
         vocab_dict = token_to_index
@@ -185,7 +185,7 @@ def tokenize(
         reverse_dict = stem_id_to_stem if stemmer is not None else unique_tokens
         # We convert the token IDs back to tokens in-place
         for i, token_ids in enumerate(
-            tqdm(corpus_ids, desc="Reconstructing token strings", leave=leave)
+            tqdm(corpus_ids, desc="Reconstructing token strings", leave=leave, disable=not show_progress)
         ):
             corpus_ids[i] = [reverse_dict[token_id] for token_id in token_ids]
 
