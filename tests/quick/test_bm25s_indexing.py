@@ -13,19 +13,17 @@ import Stemmer
 
 import bm25s
 
-def check_sparse_matrix_allclose(matrix1, matrix2, **kwargs):
-    if matrix1.shape != matrix2.shape:
-        return False
-    
-    # use the values, indices, and indptr to compare the sparse matrix
-    if not np.allclose(matrix1.data, matrix2.data, **kwargs):
-        return False
-    if not np.allclose(matrix1.indices, matrix2.indices, **kwargs):
-        return False
-    if not np.allclose(matrix1.indptr, matrix2.indptr, **kwargs):
-        return False
-    
-    return True
+def check_scores_all_close(score1, score2, **kwargs):
+    for key in score1.keys():
+        matrix1 = score1[key]
+        matrix2 = score2[key]
+            
+        if matrix1.shape != matrix2.shape:
+            return False
+        if not np.allclose(matrix1, matrix2, **kwargs):
+            return False
+
+        return True
 
 class BM25SIndexing(unittest.TestCase):
     def test_indexing_by_corpus_type(self):
@@ -90,20 +88,20 @@ class BM25SIndexing(unittest.TestCase):
 
         # now, verify that the sparse matrix matches
         self.assertTrue(
-            check_sparse_matrix_allclose(
-                bm25_tokens.score_matrix, bm25_tuples.score_matrix
+            check_scores_all_close(
+                bm25_tokens.scores, bm25_tuples.scores
             ),
             "Tokenized and Tuple indexing do not match",
         )
         self.assertTrue(
-            check_sparse_matrix_allclose(
-                bm25_tokens.score_matrix, bm25_objects.score_matrix
+            check_scores_all_close(
+                bm25_tokens.scores, bm25_objects.scores
             ),
             "Tokenized and Object indexing do not match",
         )
         self.assertTrue(
-            check_sparse_matrix_allclose(
-                bm25_tokens.score_matrix, bm25_namedtuple.score_matrix
+            check_scores_all_close(
+                bm25_tokens.scores, bm25_namedtuple.scores
             ),
             "Tokenized and NamedTuple indexing do not match",
         )

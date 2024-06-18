@@ -10,7 +10,7 @@ try:
 except ImportError:
     pass
 
-from bm25s import topk_single_query
+from bm25s.selection import topk
 
 
 class TestTopKSingleQuery(unittest.TestCase):
@@ -32,25 +32,25 @@ class TestTopKSingleQuery(unittest.TestCase):
             self.assertTrue(np.all(np.isin(result_indices, self.expected_indices)))
 
     def test_topk_numpy_sorted(self):
-        result_scores, result_indices = topk_single_query(self.scores, self.k, backend="numpy", sorted=True)
+        result_scores, result_indices = topk(self.scores, self.k, backend="numpy", sorted=True)
         self.check_results(result_scores, result_indices, sorted=True)
 
     def test_topk_numpy_unsorted(self):
-        result_scores, result_indices = topk_single_query(self.scores, self.k, backend="numpy", sorted=False)
+        result_scores, result_indices = topk(self.scores, self.k, backend="numpy", sorted=False)
         self.check_results(result_scores, result_indices, sorted=False)
 
     @unittest.skipUnless(JAX_IS_AVAILABLE, "JAX is not available")
     def test_topk_jax_sorted(self):
-        result_scores, result_indices = topk_single_query(jnp.array(self.scores), self.k, backend="jax", sorted=True)
+        result_scores, result_indices = topk(jnp.array(self.scores), self.k, backend="jax", sorted=True)
         self.check_results(result_scores, result_indices, sorted=True)
 
     @unittest.skipUnless(JAX_IS_AVAILABLE, "JAX is not available")
     def test_topk_jax_unsorted(self):
-        result_scores, result_indices = topk_single_query(jnp.array(self.scores), self.k, backend="jax", sorted=False)
+        result_scores, result_indices = topk(jnp.array(self.scores), self.k, backend="jax", sorted=False)
         self.check_results(result_scores, result_indices, sorted=False)
 
     def test_topk_auto_backend(self):
-        result_scores, result_indices = topk_single_query(self.scores, self.k, backend="auto", sorted=True)
+        result_scores, result_indices = topk(self.scores, self.k, backend="auto", sorted=True)
         self.check_results(result_scores, result_indices, sorted=True)
     
     def test_jax_installed_but_unavailable(self):
@@ -58,7 +58,7 @@ class TestTopKSingleQuery(unittest.TestCase):
         original_jax_is_available = JAX_IS_AVAILABLE
         JAX_IS_AVAILABLE = False  # Temporarily pretend JAX is not available
         
-        result_scores, result_indices = topk_single_query(self.scores, self.k, backend="auto", sorted=True)
+        result_scores, result_indices = topk(self.scores, self.k, backend="auto", sorted=True)
         self.check_results(result_scores, result_indices, sorted=True)
         
         JAX_IS_AVAILABLE = original_jax_is_available  # Restore the original value
