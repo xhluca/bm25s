@@ -523,8 +523,10 @@ class BM25:
             if isinstance(corpus, utils.corpus.JsonlCorpus):
                 retrieved_docs = corpus[indices]
             else:
-                corpus_array = np.array(corpus)
-                retrieved_docs = corpus_array[indices]
+                index_flat = indices.flatten().tolist()
+                results = [corpus[i] for i in index_flat]
+                retrieved_docs = np.array(results).reshape(indices.shape)
+
         if return_as == "tuple":
             return Results(documents=retrieved_docs, scores=scores)
         elif return_as == "documents":
