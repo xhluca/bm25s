@@ -53,10 +53,12 @@ def topk(query_scores, k, backend="auto", sorted=True):
     if backend == "auto":
         # if jax.lax is available, use it to speed up selection, otherwise use numpy
         backend = "jax" if JAX_IS_AVAILABLE else "numpy"
-
+    
     if backend not in ["numpy", "jax"]:
         raise ValueError("Invalid backend. Please choose from 'numpy' or 'jax'.")
     elif backend == "jax":
+        if not JAX_IS_AVAILABLE:
+            raise ImportError("JAX is not available. Please install JAX with `pip install jax[cpu]` to use this backend.")
         return _topk_jax(query_scores, k)
     else:
         return _topk_numpy(query_scores, k, sorted)
