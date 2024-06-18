@@ -1,10 +1,31 @@
-# BM25S
+<div align="center">
 
-*Ultrafast implementation of BM25 in pure Python, powered by Scipy sparse matrices.*
+<h1>BM25S⚡</h1>
 
-Welcome to `bm25s`, a Python package that implements the BM25 algorithm for ranking documents based on a query. BM25 is a widely used ranking function used for text retrieval tasks. BM25S is designed to be:
+<i>Ultrafast implementation of BM25 in pure Python, powered by Scipy sparse matrices</i>
+
+<table>
+      <tr>
+            <td>
+                  <a href="https://github.com/xhluca/bm25s">💻 GitHub</a>
+            </td>
+            <td>
+                  <a href="https://bm25s.github.io">🏠 Homepage</a>
+            </td>
+      </tr>
+</table>
+
+</div>
+
+Welcome to `bm25s`, a Python package that implements the BM25 algorithm for ranking documents based on a query. BM25 is a widely used ranking function used for text retrieval tasks, and is a core component of search services like Elasticsearch.
+
+It is designed to be:
 * **Fast**: `bm25s` is implemented in pure Python and leverage Scipy sparse matrices to store eagerly computed scores for all document tokens. This allows extremely fast scoring at query time, improving performance over popular libraries by orders of magnitude (see benchmarks below).
 * **Simple**: `bm25s` is designed to be easy to use and understand. You can install it with pip and start using it in minutes. There is no dependencies on Java or Pytorch - all you need is Scipy and Numpy, and optional lightweight dependencies for stemming.
+
+Here's a comparison of `bm25s`'s speedup with respect to rank-bm25, compared to Elasticsearch (which uses BM25 behind the scene).
+
+![comparison](assets/comparison.png)
 
 ## Installation
 
