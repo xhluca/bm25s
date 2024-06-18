@@ -268,25 +268,25 @@ Here are some benchmarks comparing `bm25s` to other popular BM25 implementations
 
 ### Throughput (Queries per second)
 
-We compare the throughput of the BM25 implementations on various datasets. The throughput is measured in queries per second (QPS), on a single-threaded Intel Xeon CPU @ 2.70GHz (found on Kaggle). For BM25S, we take the average of 10 runs.
+We compare the throughput of the BM25 implementations on various datasets. The throughput is measured in queries per second (QPS), on a single-threaded Intel Xeon CPU @ 2.70GHz (found on Kaggle). For BM25S, we take the average of 10 runs. Instances exceeding 60 queries/s are in **bold**.
 
 | Dataset          |   BM25S | Elastic | BM25-PT | Rank-BM25 |
 | :--------------- | ------: | ------: | ------: | --------: |
-| arguana          |  573.91 |   13.67 |  110.51 |         2 |
+| arguana          |  **573.91** |   13.67 |  **110.51** |         2 |
 | climate-fever    |   13.09 |    4.02 |     OOM |      0.03 |
-| cqadupstack      |  170.91 |   13.38 |     OOM |      0.77 |
+| cqadupstack      |  **170.91** |   13.38 |     OOM |      0.77 |
 | dbpedia-entity   |   13.44 |   10.68 |     OOM |      0.11 |
 | fever            |   20.19 |    7.45 |     OOM |      0.06 |
-| fiqa             |  507.03 |   16.96 |   20.52 |      4.46 |
+| fiqa             |  **507.03** |   16.96 |   20.52 |      4.46 |
 | hotpotqa         |   20.88 |    7.11 |     OOM |      0.04 |
 | msmarco          |    12.2 |   11.88 |     OOM |      0.07 |
-| nfcorpus         | 1196.16 |   45.84 |  256.67 |    224.66 |
+| nfcorpus         | **1196.16** |   45.84 |  256.67 |    **224.66** |
 | nq               |   41.85 |   12.16 |     OOM |       0.1 |
-| quora            |  183.53 |    21.8 |    6.49 |      1.18 |
-| scidocs          |  767.05 |   17.93 |   41.34 |      9.01 |
-| scifact          |  952.92 |   20.81 |   184.3 |      47.6 |
-| trec-covid       |   85.64 |    7.34 |    3.73 |      1.48 |
-| webis-touche2020 |   60.59 |   13.53 |     OOM |       1.1 |
+| quora            |  **183.53** |    21.8 |    6.49 |      1.18 |
+| scidocs          |  **767.05** |   17.93 |   41.34 |      9.01 |
+| scifact          |  **952.92** |   20.81 |   **184.3** |      47.6 |
+| trec-covid       |   **85.64** |    7.34 |    3.73 |      1.48 |
+| webis-touche2020 |   **60.59** |   13.53 |     OOM |       1.1 |
 
 More detailed benchmarks can be found in the [bm25-benchmarks repo](https://github.com/xhluca/bm25-benchmarks).
 
@@ -320,3 +320,16 @@ $ du -s *env-* --block-size=1MB
 For `pyserini`, we use the [recommended installation](https://github.com/castorini/pyserini/blob/master/docs/installation.md) with conda environment to account for Java dependencies.
 
 </details>
+
+### Optimized RAM usage
+
+`bm25s` allows considerable memory saving through the use of *memory-mapping*, which allows the index to be stored on disk and loaded on demand. 
+
+When testing with 6 arbitrary queries with an index built with MS MARCO (8.8M documents, 300M+ tokens), we have the following:
+
+| Method | Load Index (s) | Retrieval (s) | RAM usage (GB) |
+| ------ | ----------------- | ------------- | -------------- |
+| Memory-mapped | 0.62 | 0.18 | 0.90 |
+| In-memory | 11.41 | 0.74 | 10.56 |
+
+When you run `bm25s` on 1000 queries on the Natural Questions dataset (2M+ documents), the memory usage is over 50% lower than the in-memory version with trivial difference in speed. You can find more information in the [GitHub repository](https://github.com/xhluca/bm25s).
