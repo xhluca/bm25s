@@ -57,7 +57,7 @@ retriever = BM25HF.load_from_hub("{username}/{repo_name}", revision="main")
 
 # You can retrieve now
 query = "a cat is a feline"
-results = retriever.retrieve(query, k=3)
+results = retriever.retrieve(bm25s.tokenize(query), k=3)
 ```
 
 ## Saving a `bm25s` index
