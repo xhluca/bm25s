@@ -15,6 +15,7 @@ except ImportError:
 
 README_TEMPLATE = """---
 language: en
+library_name: bm25s
 tags:
 - bm25
 - bm25s
