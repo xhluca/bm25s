@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 
 package_name = "bm25s"
 version = {}
-with open(f"{package_name}/version.py") as fp:
+with open(f"{package_name}/version.py", encoding="utf8") as fp:
     exec(fp.read(), version)
 
-with open("README.md") as fp:
+with open("README.md", encoding="utf8") as fp:
     long_description = fp.read()
 
 extras_require = {
