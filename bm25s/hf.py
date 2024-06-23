@@ -28,7 +28,8 @@ tags:
 
 This is a BM25S index created with the [`bm25s` library](https://github.com/xhluca/bm25s) (version `{version}`), an ultra-fast implementation of BM25. It can be used for lexical retrieval tasks.
 
-[BM25S GitHub Repository](https://github.com/xhluca/bm25s)
+💻[BM25S GitHub Repository](https://github.com/xhluca/bm25s)\
+🌐[BM25S Homepage](https://bm25s.github.io)
 
 ## Installation
 
@@ -54,6 +55,7 @@ from bm25s.hf import BM25HF
 
 # Load the index
 retriever = BM25HF.load_from_hub("{username}/{repo_name}", revision="main")
+
 
 # You can retrieve now
 query = "a cat is a feline"
@@ -83,6 +85,20 @@ token = None  # You can get a token from the Hugging Face website
 retriever.save_to_hub("{username}/{repo_name}", token=token)
 ```
 
+## Advanced usage
+
+You can leverage more advanced features of the BM25S library during `load_from_hub`:
+
+```python
+# Load corpus and index in memory-map (mmap=True) to reduce memory
+retriever = BM25HF.load_from_hub("{username}/{repo_name}", load_corpus=True, mmap=True)
+
+# Load a different branch/revision
+retriever = BM25HF.load_from_hub("{username}/{repo_name}", revision="main")
+
+# Change directory where the local files should be downloaded
+retriever = BM25HF.load_from_hub("{username}/{repo_name}", local_dir="/path/to/dir")
+```
 
 ## Stats
 
@@ -259,7 +275,7 @@ class BM25HF(BM25):
         if include_readme:
             num_docs = self.scores["num_docs"]
             num_tokens = self.scores["data"].shape[0]
-            avg_tokens_per_doc = num_tokens / num_docs
+            avg_tokens_per_doc = round(num_tokens / num_docs, 2)
 
             results = README_TEMPLATE.format(
                 username=username,
