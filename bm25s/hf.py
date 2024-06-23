@@ -54,8 +54,7 @@ import bm25s
 from bm25s.hf import BM25HF
 
 # Load the index
-retriever = BM25HF.load_from_hub("{username}/{repo_name}", revision="main")
-
+retriever = BM25HF.load_from_hub("{username}/{repo_name}")
 
 # You can retrieve now
 query = "a cat is a feline"
