@@ -11,9 +11,10 @@ except ImportError:
 
 try:
     from tqdm.auto import tqdm
+    TQDM_AVAILABLE = True
 except ImportError:
-
-    def tqdm(iterable, *args, **kwargs):
+    TQDM_AVAILABLE = False
+    def tqdm(iterable=None, *args, **kwargs):
         return iterable
 
 
@@ -29,17 +30,22 @@ def find_newline_positions(path, show_progress=True, leave_progress=True):
         indexes.append(f.tell())
         pbar = tqdm(
             total=os.path.getsize(path),
-            desc="Indexing",
+            desc="Finding newlines for mmindex",
             unit="B",
             unit_scale=True,
             disable=not show_progress,
             leave=leave_progress,
         )
-        while f.readline():
-            indexes.append(f.tell())
-            pbar.update(f.tell() - indexes[-2])
 
-        pbar.close()
+        while f.readline():
+            t = f.tell()
+            indexes.append(t)
+        
+            if pbar is not None:
+                pbar.update(t - indexes[-2])
+        
+        if pbar is not None:
+            pbar.close()
 
     return indexes[:-1]
 

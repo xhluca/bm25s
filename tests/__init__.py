@@ -4,18 +4,10 @@ import time
 import unittest
 from pathlib import Path
 import warnings
-import logging
 
 import numpy as np
-import rank_bm25
-from beir.datasets.data_loader import GenericDataLoader
-from beir.util import download_and_unzip
-import Stemmer
-from transformers import AutoTokenizer
-import bm25_pt
 
 import bm25s
-import bm25s.hf
 
 
 # Make sure to import or define the functions/classes you're going to use,
@@ -51,6 +43,11 @@ class BM25TestCase(unittest.TestCase):
         queries_subsample=None,
         method="rank",
     ):
+        from beir.datasets.data_loader import GenericDataLoader
+        from beir.util import download_and_unzip
+        import rank_bm25
+        import Stemmer
+
         warnings.filterwarnings("ignore", category=ResourceWarning)
 
         if method not in ["rank", "bm25+", "bm25l"]:
@@ -183,6 +180,12 @@ class BM25TestCase(unittest.TestCase):
         corpus_subsample=None,
         queries_subsample=None,
     ):
+        from beir.datasets.data_loader import GenericDataLoader
+        from beir.util import download_and_unzip
+        import bm25_pt
+        import bm25s.hf
+
+        from transformers import AutoTokenizer
 
         warnings.filterwarnings("ignore", category=ResourceWarning)
         warnings.filterwarnings("ignore", category=UserWarning)
