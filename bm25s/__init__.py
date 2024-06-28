@@ -353,6 +353,7 @@ class BM25:
                 unique_token_ids=unique_token_ids,
                 corpus_token_ids=corpus_token_ids,
                 leave_progress=leave_progress,
+                show_progress=show_progress,
             )
 
         self.scores = scores
