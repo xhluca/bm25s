@@ -1,8 +1,8 @@
 <div align="center">
 
-<h1>BM25S⚡</h1>
+<h1>BM25-Sparse⚡</h1>
 
-<i>Ultrafast implementation of BM25 in pure Python, powered by Scipy sparse matrices</i>
+<i>BM25S is an ultrafast implementation of BM25 in pure Python, powered by Scipy sparse matrices</i>
 
 <table>
       <tr>
