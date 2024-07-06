@@ -14,7 +14,7 @@ def build_inverted_index(corpus_tokens: Tokenized) -> dict:
     
     return inverted_index
 
-def select_relevant_indices(queries: list, corpus_vocab, inverted_index: dict, k=None) -> list:
+def select_relevant_indices(queries: list, corpus_vocab, inverted_index: dict, return_as="numpy") -> list:
     if isinstance(queries, Tokenized):
         queries = convert_tokenized_to_string_list(queries)
     
@@ -29,7 +29,15 @@ def select_relevant_indices(queries: list, corpus_vocab, inverted_index: dict, k
         relevant_docs = []
         for token_id in query:
             relevant_docs.extend(inverted_index.get(token_id, []))
-        rel = np.unique(relevant_docs).astype(np.int64)
+        
+        if return_as == "jax":
+            import jax
+            rel = jax.numpy.unique(jax.numpy.asarray(relevant_docs))
+        elif return_as == "numpy":
+            rel = np.array(relevant_docs).astype(np.int64)
+        else:
+            raise ValueError(f"Unknown return_as: {return_as}")
+
         relevant_indices.append(rel)
     
     return relevant_indices
