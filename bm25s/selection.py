@@ -45,20 +45,35 @@ def _topk_jax(query_scores, k):
     return topk_scores, topk_indices
 
 
-def topk(query_scores, k, backend="auto", sorted=True):
+def topk(query_scores, k, backend="auto", sorted=True, relevant_indices=None):
     """
     This function is used to retrieve the top-k results for a single query. It will only work
     on a 1-dimensional array of scores.
     """
     if backend == "auto":
         # if jax.lax is available, use it to speed up selection, otherwise use numpy
-        backend = "jax" if JAX_IS_AVAILABLE else "numpy"
+        backend = "jax" if (JAX_IS_AVAILABLE and relevant_indices is None) else "numpy"
     
+    if backend == "jax" and relevant_indices is not None:
+        raise ValueError("JAX backend does not support 'relevant_indices'. Please use 'numpy' backend instead.")
+    
+    if relevant_indices is not None:
+        if len(relevant_indices) < k:
+            relevant_indices = None
+        else:
+            query_scores = query_scores[relevant_indices]
+
     if backend not in ["numpy", "jax"]:
         raise ValueError("Invalid backend. Please choose from 'numpy' or 'jax'.")
     elif backend == "jax":
         if not JAX_IS_AVAILABLE:
             raise ImportError("JAX is not available. Please install JAX with `pip install jax[cpu]` to use this backend.")
-        return _topk_jax(query_scores, k)
+        out =  _topk_jax(query_scores=query_scores, k=k)
     else:
-        return _topk_numpy(query_scores, k, sorted)
+        out = _topk_numpy(query_scores=query_scores, k=k, sorted=sorted)
+
+    if relevant_indices is not None:
+        # if we used only a subset of scores, we need to map the indices back to the original indices of query_scores_full
+        out = (out[0], relevant_indices[out[1]])
+
+    return out

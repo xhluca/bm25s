@@ -28,7 +28,7 @@ else:
         tqdm = _faketqdm
 
 
-from . import selection, utils, stopwords, scoring, tokenization
+from . import selection, utils, stopwords, scoring, tokenization, inverted_index
 from .version import __version__
 from .tokenization import tokenize
 from .scoring import (
@@ -398,6 +398,7 @@ class BM25:
     def _get_top_k_results(
         self,
         query_tokens_single: List[str],
+        relevant_indices: List[int],
         k: int = 1000,
         backend="auto",
         sorted: bool = False,
@@ -409,7 +410,7 @@ class BM25:
         """
         scores_q = self.get_scores(query_tokens_single)
         topk_scores, topk_indices = selection.topk(
-            scores_q, k=k, sorted=sorted, backend=backend
+            scores_q, k=k, sorted=sorted, backend=backend, relevant_indices=relevant_indices
         )
 
         return topk_scores, topk_indices
@@ -426,6 +427,7 @@ class BM25:
         n_threads: int = 0,
         chunksize: int = 50,
         backend_selection: str = "auto",
+        relevant_indices=None,
     ):
         """
         Retrieve the top-k documents for each query (tokenized).
@@ -499,15 +501,18 @@ class BM25:
             self._get_top_k_results, k=k, sorted=sorted, backend=backend_selection
         )
 
+        if relevant_indices is None:
+            relevant_indices = [None] * len(query_tokens)
+
         if n_threads == 0:
             # Use a simple map function to retrieve the results
-            out = tqdm(map(topk_fn, query_tokens), **tqdm_kwargs)
+            out = tqdm(map(topk_fn, query_tokens, relevant_indices), **tqdm_kwargs)
         else:
-            # Use concurrent.futures.ProcessPoolExecutor to parallelize the computation
             with ThreadPoolExecutor(max_workers=n_threads) as executor:
                 process_map = executor.map(
                     topk_fn,
                     query_tokens,
+                    relevant_indices,
                     chunksize=chunksize,
                 )
                 out = list(tqdm(process_map, **tqdm_kwargs))
