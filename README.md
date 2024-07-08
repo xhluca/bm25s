@@ -33,6 +33,23 @@ Below, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25
 
 ![comparison](assets/comparison.png)
 
+<details>
+<summary>Click to show citation</summary><br>
+
+```
+@misc{bm25s,
+      title={BM25S: Orders of magnitude faster lexical search via eager sparse scoring}, 
+      author={Xing Han Lù},
+      year={2024},
+      eprint={2407.03618},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2407.03618}, 
+}
+```
+
+</details>
+
 ## Installation
 
 You can install `bm25s` with pip:
@@ -54,7 +71,7 @@ pip install PyStemmer
 pip install jax[cpu]
 ```
 
-## Usage
+## Quickstart
 
 Here is a simple example of how to use `bm25s`:
 
@@ -339,3 +356,19 @@ When testing with 6 arbitrary queries with an index built with MS MARCO (8.8M do
 | In-memory | 11.41 | 0.74 | 10.56 |
 
 When you run `bm25s` on 1000 queries on the Natural Questions dataset (2M+ documents), the memory usage is over 50% lower than the in-memory version with trivial difference in speed. You can find more information in the [GitHub repository](https://github.com/xhluca/bm25s).
+
+## Citation
+
+If you use `bm25s` in your work, please use the following bibtex:
+
+```
+@misc{bm25s,
+      title={BM25S: Orders of magnitude faster lexical search via eager sparse scoring}, 
+      author={Xing Han Lù},
+      year={2024},
+      eprint={2407.03618},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2407.03618}, 
+}
+```
