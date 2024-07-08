@@ -13,7 +13,7 @@
                   <a href="https://bm25s.github.io">🏠 Homepage</a>
             </td>
             <td>
-                  <a href="https://huggingface.co/collections/xhluca/bm25s-indices-6670f65d459aa2d3b967cbb8">🤗 Collection</a>
+                  <a href="https://arxiv.org/abs/2407.03618">📝 Technical Report</a>
             </td>
             <td>
                   <a href="https://huggingface.co/blog/xhluca/bm25s">🤗 Blog Post</a>
