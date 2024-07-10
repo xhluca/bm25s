@@ -28,8 +28,13 @@ tags:
 
 This is a BM25S index created with the [`bm25s` library](https://github.com/xhluca/bm25s) (version `{version}`), an ultra-fast implementation of BM25. It can be used for lexical retrieval tasks.
 
-💻[BM25S GitHub Repository](https://github.com/xhluca/bm25s)\\
-🌐[BM25S Homepage](https://bm25s.github.io)
+BM25S Related Links:
+
+* 🏠[Homepage](https://bm25s.github.io)
+* 💻[GitHub Repository](https://github.com/xhluca/bm25s)
+* 🤗[Blog Post](https://huggingface.co/blog/xhluca/bm25s)
+* 📝[Technical Report](https://arxiv.org/abs/2407.03618)
+
 
 ## Installation
 
