@@ -420,7 +420,7 @@ class BM25:
         corpus: List[Any] = None,
         k: int = 10,
         sorted: bool = True,
-        return_as: bool = "tuple",
+        return_as: str = "tuple",
         show_progress: bool = True,
         leave_progress: bool = False,
         n_threads: int = 0,
@@ -452,7 +452,7 @@ class BM25:
         sorted : bool
             If True, the function will sort the results by score before returning them.
 
-        return_as : bool
+        return_as : str
             If return_as="tuple", a named tuple with two fields will be returned:
             `documents` and `scores`, which can be accessed as `result.documents` and
             `result.scores`, or by unpacking, e.g. `documents, scores = retrieve(...)`.
