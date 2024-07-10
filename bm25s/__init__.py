@@ -18,6 +18,7 @@ except ImportError:
 def _faketqdm(iterable, *args, **kwargs):
     return iterable
 
+
 if os.environ.get("DISABLE_TQDM", False):
     tqdm = _faketqdm
     # if can't import tqdm, use a fake tqdm
@@ -65,6 +66,26 @@ def get_unique_tokens(
         unique_tokens.update(doc_tokens)
     return unique_tokens
 
+def _is_tuple_of_list_of_tokens(obj):
+    if not isinstance(obj, tuple):
+        return False
+    
+    if len(obj) == 0:
+        return False
+
+    first_elem = obj[0]
+    if not isinstance(first_elem, list):
+        return False
+    
+    if len(first_elem) == 0:
+        return False
+    
+    first_token  = first_elem[0]
+    if not isinstance(first_token, str):
+        return False
+    
+    return True
+    
 
 def _calculate_scores_with_arrays(
     data, indptr, indices, num_docs, query_tokens_ids, dtype
@@ -416,11 +437,11 @@ class BM25:
 
     def retrieve(
         self,
-        query_tokens: List[List[str]],
+        query_tokens: Union[List[List[str]], tokenization.Tokenized],
         corpus: List[Any] = None,
         k: int = 10,
         sorted: bool = True,
-        return_as: bool = "tuple",
+        return_as: str = "tuple",
         show_progress: bool = True,
         leave_progress: bool = False,
         n_threads: int = 0,
@@ -432,7 +453,7 @@ class BM25:
 
         Parameters
         ----------
-        query_tokens : List[List[str]]
+        query_tokens : List[List[str]] or bm25s.tokenization.Tokenized
             List of list of tokens for each query. If a Tokenized object is provided,
             it will be converted to a list of list of tokens.
 
@@ -452,7 +473,7 @@ class BM25:
         sorted : bool
             If True, the function will sort the results by score before returning them.
 
-        return_as : bool
+        return_as : str
             If return_as="tuple", a named tuple with two fields will be returned:
             `documents` and `scores`, which can be accessed as `result.documents` and
             `result.scores`, or by unpacking, e.g. `documents, scores = retrieve(...)`.
@@ -461,7 +482,7 @@ class BM25:
 
         show_progress : bool
             If True, a progress bar will be shown. If False, no progress bar will be shown.
-        
+
         leave_progress : bool
             If True, the progress bars will remain after the function completes.
 
@@ -485,6 +506,28 @@ class BM25:
 
         if n_threads == -1:
             n_threads = os.cpu_count()
+    
+
+        if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
+            if len(query_tokens) != 2:
+                msg = (
+                    "Expected a list of string or a tuple of two elements: the first element is the "
+                    "list of unique token IDs, "
+                    "and the second element is the list of token IDs for each document."
+                    f"Found {len(query_tokens)} elements instead."
+                )
+                raise ValueError(msg)
+            else:
+                ids, vocab = query_tokens
+                if not isinstance(ids, Iterable):
+                    raise ValueError(
+                        "The first element of the tuple passed to retrieve must be an iterable."
+                    )
+                if not isinstance(vocab, dict):
+                    raise ValueError(
+                        "The second element of the tuple passed to retrieve must be a dictionary."
+                    )
+                query_tokens = tokenization.Tokenized(ids=ids, vocab=vocab)
 
         if isinstance(query_tokens, tokenization.Tokenized):
             query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
@@ -749,7 +792,6 @@ class BM25:
             "indptr": indptr,
             "num_docs": params.pop("num_docs", None),
         }
-
 
         bm25_obj = cls(**params)
         bm25_obj.scores = scores
