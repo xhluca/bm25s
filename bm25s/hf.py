@@ -127,6 +127,23 @@ The index was created with the following parameters:
 | delta | `{delta}` |
 | method | `{method}` |
 | idf method | `{idf_method}` |
+
+## Citation
+
+To cite `bm25s`, please use the following bibtex:
+
+```
+@misc{lu_2024_bm25s,
+      title={BM25S: Orders of magnitude faster lexical search via eager sparse scoring}, 
+      author={Xing Han Lù},
+      year={2024},
+      eprint={2407.03618},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2407.03618}, 
+}
+```
+
 """
 
 
