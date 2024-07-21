@@ -9,7 +9,19 @@ except ImportError:
         return iterable
 
 
-from .stopwords import STOPWORDS_EN
+from .stopwords import (
+    STOPWORDS_EN,
+    STOPWORDS_GERMAN,
+    STOPWORDS_DUTCH,
+    STOPWORDS_FRENCH,
+    STOPWORDS_SPANISH,
+    STOPWORDS_PORTUGUESE,
+    STOPWORDS_ITALIAN,
+    STOPWORDS_RUSSIAN,
+    STOPWORDS_SWEDISH,
+    STOPWORDS_NORWEGIAN,
+    STOPWORDS_CHINESE,
+)
 
 
 class Tokenized(NamedTuple):
@@ -35,13 +47,33 @@ def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
 
 
 def _infer_stopwords(stopwords: Union[str, List[str]]) -> List[str]:
-    if stopwords in ["english", "en", True]:
+    if stopwords in ["english", "en", True]: # True is added to support the default
         return STOPWORDS_EN
+    elif stopwords in ["german", "de"]:
+        return STOPWORDS_GERMAN
+    elif stopwords in ["dutch", "nl"]:
+        return STOPWORDS_DUTCH
+    elif stopwords in ["french", "fr"]:
+        return STOPWORDS_FRENCH
+    elif stopwords in ["spanish", "es"]:
+        return STOPWORDS_SPANISH
+    elif stopwords in ["portuguese", "pt"]:
+        return STOPWORDS_PORTUGUESE
+    elif stopwords in ["italian", "it"]:
+        return STOPWORDS_ITALIAN
+    elif stopwords in ["russian", "ru"]:
+        return STOPWORDS_RUSSIAN
+    elif stopwords in ["swedish", "sv"]:
+        return STOPWORDS_SWEDISH
+    elif stopwords in ["norwegian", "no"]:
+        return STOPWORDS_NORWEGIAN
+    elif stopwords in ["chinese", "zh"]:
+        return STOPWORDS_CHINESE
     elif stopwords in [None, False]:
         return []
     elif isinstance(stopwords, str):
         raise ValueError(
-            f"{stopwords} not recognized. Only default English stopwords are currently supported. "
+            f"{stopwords} not recognized. Only English stopwords as default, German, Dutch, French, Spanish, Portuguese, Italian, Russian, Swedish, Norwegian, and Chinese are currently supported. "
             "Please input a list of stopwords"
         )
     else:
