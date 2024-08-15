@@ -212,6 +212,9 @@ class BM25:
         for i in range(len(query_tokens_ids)):
             start, end = indptr_starts[i], indptr_ends[i]
             scores[indices[start:end]] += data[start:end]
+            # # The following code is slower with numpy, but faster after JIT compilation
+            # for j in range(start, end):
+            #     scores[indices[j]] += data[j]
 
         return scores
 
