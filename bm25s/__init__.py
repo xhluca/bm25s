@@ -88,29 +88,48 @@ def _is_tuple_of_list_of_tokens(obj):
     
 
 def _calculate_scores_with_arrays(
-    data, indptr, indices, num_docs, query_tokens_ids, dtype
-):
-    # First, we use the query_token_ids to select the relevant columns from the score_matrix
-    query_tokens_ids = np.array(query_tokens_ids, dtype=int)
+    data: np.ndarray,
+    indptr: np.ndarray,
+    indices: np.ndarray,
+    num_docs: int,
+    query_tokens_ids: np.ndarray,
+    dtype: np.dtype,
+) -> np.ndarray:
+    """
+    Calculate BM25 scores for given token IDs.
+    
+    Parameters
+    ----------
+    data (np.ndarray)
+        Data array of the BM25 index.
+    indptr (np.ndarray)
+        Index pointer array of the BM25 index.
+    indices (np.ndarray)
+        Indices array of the BM25 index.
+    num_docs (int)
+        Number of documents in the BM25 index.
+    query_tokens_ids (np.ndarray)
+        Array of token IDs to score.
+    dtype (np.dtype)
+        Data type for score calculation.
+
+    Returns
+    -------
+    np.ndarray
+        Array of BM25 scores.
+    
+    Note
+    ----
+    This function was optimized by the baguetter library. The original implementation can be found at:
+    https://github.com/mixedbread-ai/baguetter/blob/main/baguetter/indices/sparse/models/bm25/index.py
+    """
     indptr_starts = indptr[query_tokens_ids]
     indptr_ends = indptr[query_tokens_ids + 1]
 
-    scores_lists = []
-    indices_lists = []
-
-    for i, (start, end) in enumerate(zip(indptr_starts, indptr_ends)):
-        scores_lists.append(data[start:end])
-        indices_lists.append(indices[start:end])
-
-    # combine the lists into a single array
-
     scores = np.zeros(num_docs, dtype=dtype)
-    if len(scores_lists) == 0:
-        return scores
-
-    scores_flat = np.concatenate(scores_lists)
-    indices_flat = np.concatenate(indices_lists)
-    np.add.at(scores, indices_flat, scores_flat)
+    for i in range(len(query_tokens_ids)):
+        start, end = indptr_starts[i], indptr_ends[i]
+        scores[indices[start:end]] += data[start:end]
 
     return scores
 
@@ -395,13 +414,17 @@ class BM25:
         indptr = self.scores["indptr"]
         num_docs = self.scores["num_docs"]
 
+        dtype = np.dtype(self.dtype)
+        int_dtype = np.dtype(self.int_dtype)
+        query_tokens_ids = np.asarray(query_tokens_ids, dtype=int_dtype)
+
         scores = _calculate_scores_with_arrays(
             data=data,
             indptr=indptr,
             indices=indices,
             num_docs=num_docs,
             query_tokens_ids=query_tokens_ids,
-            dtype=self.dtype,
+            dtype=dtype,
         )
 
         # if there's a non-occurrence array, we need to add the non-occurrence score
