@@ -291,3 +291,37 @@ def _build_scores_and_indices_for_matrix(
         scores[start:end] = scores_doc
 
     return scores, doc_indices, voc_indices
+
+
+def _compute_relevance_from_scores_legacy(
+    data, indptr, indices, num_docs, query_tokens_ids, dtype
+):
+    """
+    The legacy implementation of the `_compute_relevance_from_scores` function. This may
+    be faster than the new implementation for some cases, but it cannot benefit from
+    numba acceleration, as it uses python lists. This function is kept for reference
+    and comparison purposes.
+    """
+    # First, we use the query_token_ids to select the relevant columns from the score_matrix
+    query_tokens_ids = np.array(query_tokens_ids, dtype=int)
+    indptr_starts = indptr[query_tokens_ids]
+    indptr_ends = indptr[query_tokens_ids + 1]
+
+    scores_lists = []
+    indices_lists = []
+
+    for i, (start, end) in enumerate(zip(indptr_starts, indptr_ends)):
+        scores_lists.append(data[start:end])
+        indices_lists.append(indices[start:end])
+
+    # combine the lists into a single array
+
+    scores = np.zeros(num_docs, dtype=dtype)
+    if len(scores_lists) == 0:
+        return scores
+
+    scores_flat = np.concatenate(scores_lists)
+    indices_flat = np.concatenate(indices_lists)
+    np.add.at(scores, indices_flat, scores_flat)
+
+    return scores
