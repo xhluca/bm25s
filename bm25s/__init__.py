@@ -96,7 +96,9 @@ def _calculate_scores_with_arrays(
     dtype: np.dtype,
 ) -> np.ndarray:
     """
-    Calculate BM25 scores for given token IDs.
+    This internal static function calculates BM25 scores for given token IDs.
+    It is used by the `get_scores_from_ids` method, which makes use of the precomputed
+    scores assigned as attributes of the BM25 object.
     
     Parameters
     ----------
