@@ -85,55 +85,6 @@ def _is_tuple_of_list_of_tokens(obj):
         return False
     
     return True
-    
-
-def _calculate_scores_with_arrays(
-    data: np.ndarray,
-    indptr: np.ndarray,
-    indices: np.ndarray,
-    num_docs: int,
-    query_tokens_ids: np.ndarray,
-    dtype: np.dtype,
-) -> np.ndarray:
-    """
-    This internal static function calculates BM25 scores for given token IDs.
-    It is used by the `get_scores_from_ids` method, which makes use of the precomputed
-    scores assigned as attributes of the BM25 object.
-    
-    Parameters
-    ----------
-    data (np.ndarray)
-        Data array of the BM25 index.
-    indptr (np.ndarray)
-        Index pointer array of the BM25 index.
-    indices (np.ndarray)
-        Indices array of the BM25 index.
-    num_docs (int)
-        Number of documents in the BM25 index.
-    query_tokens_ids (np.ndarray)
-        Array of token IDs to score.
-    dtype (np.dtype)
-        Data type for score calculation.
-
-    Returns
-    -------
-    np.ndarray
-        Array of BM25 scores.
-    
-    Note
-    ----
-    This function was optimized by the baguetter library. The original implementation can be found at:
-    https://github.com/mixedbread-ai/baguetter/blob/main/baguetter/indices/sparse/models/bm25/index.py
-    """
-    indptr_starts = indptr[query_tokens_ids]
-    indptr_ends = indptr[query_tokens_ids + 1]
-
-    scores = np.zeros(num_docs, dtype=dtype)
-    for i in range(len(query_tokens_ids)):
-        start, end = indptr_starts[i], indptr_ends[i]
-        scores[indices[start:end]] += data[start:end]
-
-    return scores
 
 
 class BM25:
@@ -213,6 +164,56 @@ class BM25:
             raise ValueError(
                 "Corpus must be a list of list of tokens, an object with the `ids` and `vocab` attributes, or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
             )
+
+    @staticmethod
+    def _compute_relevance_from_scores(
+        data: np.ndarray,
+        indptr: np.ndarray,
+        indices: np.ndarray,
+        num_docs: int,
+        query_tokens_ids: np.ndarray,
+        dtype: np.dtype,
+    ) -> np.ndarray:
+        """
+        This internal static function calculates the relevance scores for a given query,
+        by using the BM25 scores that have been precomputed in the BM25 eager index.
+        It is used by the `get_scores_from_ids` method, which makes use of the precomputed
+        scores assigned as attributes of the BM25 object.
+        
+        Parameters
+        ----------
+        data (np.ndarray)
+            Data array of the BM25 index.
+        indptr (np.ndarray)
+            Index pointer array of the BM25 index.
+        indices (np.ndarray)
+            Indices array of the BM25 index.
+        num_docs (int)
+            Number of documents in the BM25 index.
+        query_tokens_ids (np.ndarray)
+            Array of token IDs to score.
+        dtype (np.dtype)
+            Data type for score calculation.
+
+        Returns
+        -------
+        np.ndarray
+            Array of BM25 scores.
+        
+        Note
+        ----
+        This function was optimized by the baguetter library. The original implementation can be found at:
+        https://github.com/mixedbread-ai/baguetter/blob/main/baguetter/indices/sparse/models/bm25/index.py
+        """
+        indptr_starts = indptr[query_tokens_ids]
+        indptr_ends = indptr[query_tokens_ids + 1]
+
+        scores = np.zeros(num_docs, dtype=dtype)
+        for i in range(len(query_tokens_ids)):
+            start, end = indptr_starts[i], indptr_ends[i]
+            scores[indices[start:end]] += data[start:end]
+
+        return scores
 
     def build_index_from_ids(
         self,
@@ -409,7 +410,7 @@ class BM25:
         return [
             self.vocab_dict[token] for token in query_tokens if token in self.vocab_dict
         ]
-
+    
     def get_scores_from_ids(self, query_tokens_ids: List[int]) -> np.ndarray:
         data = self.scores["data"]
         indices = self.scores["indices"]
@@ -420,7 +421,7 @@ class BM25:
         int_dtype = np.dtype(self.int_dtype)
         query_tokens_ids = np.asarray(query_tokens_ids, dtype=int_dtype)
 
-        scores = _calculate_scores_with_arrays(
+        scores = self._compute_relevance_from_scores(
             data=data,
             indptr=indptr,
             indices=indices,
