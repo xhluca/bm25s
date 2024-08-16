@@ -89,8 +89,8 @@ def _numba_sorted_top_k(array: np.ndarray, k: int):
     if k > n:
         k = n
 
-    values = np.empty(k, dtype=array.dtype)
-    indices = np.empty(k, dtype=np.int32)
+    values = np.zeros(k, dtype=array.dtype)
+    indices = np.zeros(k, dtype=np.int32)
     length = 0
 
     for i, value in enumerate(array):
@@ -103,8 +103,8 @@ def _numba_sorted_top_k(array: np.ndarray, k: int):
                 indices[0] = i
                 sift_up(values, indices, 0, length)
 
-    top_k_values = np.empty(k, dtype=array.dtype)
-    top_k_indices = np.empty(k, dtype=np.int32)
+    top_k_values = np.zeros(k, dtype=array.dtype)
+    top_k_indices = np.zeros(k, dtype=np.int32)
 
     for i in range(k - 1, -1, -1):
         top_k_values[i], top_k_indices[i] = heap_pop(values, indices, length)
