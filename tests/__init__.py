@@ -99,19 +99,19 @@ class BM25TestCase(unittest.TestCase):
         else:
             raise ValueError("invalid method")
         
-        start_time = time.time()
+        start_time = time.monotonic()
         bm25_sparse.index(corpus_token_strs)
-        bm25_sparse_index_time = time.time() - start_time
+        bm25_sparse_index_time = time.monotonic() - start_time
         print(f"bm25s index time:     {bm25_sparse_index_time:.4f}s")
 
         # Scoring with bm25-sparse
-        start_time = time.time()
+        start_time = time.monotonic()
         bm25_sparse_scores = [bm25_sparse.get_scores(q) for q in queries_token_strs]
-        bm25_sparse_score_time = time.time() - start_time
+        bm25_sparse_score_time = time.monotonic() - start_time
         print(f"bm25s score time:     {bm25_sparse_score_time:.4f}s")
 
         # Initialize and index rank-bm25
-        start_time = time.time()
+        start_time = time.monotonic()
         if method == "rank":
             bm25_rank = rank_bm25.BM25Okapi(corpus_token_strs, k1=1.5, b=0.75, epsilon=0.0)
         elif method == "bm25+":
@@ -121,13 +121,13 @@ class BM25TestCase(unittest.TestCase):
         else:
             raise ValueError("invalid method")
     
-        bm25_rank_index_time = time.time() - start_time
+        bm25_rank_index_time = time.monotonic() - start_time
         print(f"rank-bm25 index time: {bm25_rank_index_time:.4f}s")
 
         # Scoring with rank-bm25
-        start_time = time.time()
+        start_time = time.monotonic()
         bm25_rank_scores = [bm25_rank.get_scores(q) for q in queries_token_strs]
-        bm25_rank_score_time = time.time() - start_time
+        bm25_rank_score_time = time.monotonic() - start_time
         print(f"rank-bm25 score time: {bm25_rank_score_time:.4f}s")
 
         # print difference in time
@@ -213,13 +213,13 @@ class BM25TestCase(unittest.TestCase):
             queries_lst = queries_lst[:queries_subsample]
 
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-        t0 = time.time()
+        t0 = time.monotonic()
         tokenized_corpus = bm25s.hf.batch_tokenize(tokenizer, corpus_lst)
-        time_corpus_tok = time.time() - t0
+        time_corpus_tok = time.monotonic() - t0
 
-        t0 = time.time()
+        t0 = time.monotonic()
         queries_tokenized = bm25s.hf.batch_tokenize(tokenizer, queries_lst)
-        time_query_tok = time.time() - t0
+        time_query_tok = time.monotonic() - t0
 
         print()
         print(f"Dataset:              {dataset}\n")
@@ -230,30 +230,30 @@ class BM25TestCase(unittest.TestCase):
 
         # Initialize and index bm25-sparse
         bm25_sparse = bm25s.BM25(k1=1.5, b=0.75, method="atire", idf_method="lucene")
-        start_time = time.time()
+        start_time = time.monotonic()
         bm25_sparse.index(tokenized_corpus)
-        bm25s_index_time = time.time() - start_time
+        bm25s_index_time = time.monotonic() - start_time
         print(f"bm25s index time:     {bm25s_index_time:.4f}s")
 
         # Scoring with bm25-sparse
-        start_time = time.time()
+        start_time = time.monotonic()
         bm25_sparse_scores = [bm25_sparse.get_scores(q) for q in queries_tokenized]
-        bm25s_score_time = time.time() - start_time
+        bm25s_score_time = time.monotonic() - start_time
         print(f"bm25s score time:     {bm25s_score_time:.4f}s")
 
         # Initialize and index rank-bm25
-        start_time = time.time()
+        start_time = time.monotonic()
         model_pt = bm25_pt.BM25(tokenizer=tokenizer, device="cpu", k1=1.5, b=0.75)
         model_pt.index(corpus_lst)
-        bm25_pt_index_time = time.time() - start_time
+        bm25_pt_index_time = time.monotonic() - start_time
         bm25_pt_index_time -= time_corpus_tok
         print(f"bm25-pt index time:   {bm25_pt_index_time:.4f}s")
 
         # Scoring with rank-bm25
-        start_time = time.time()
+        start_time = time.monotonic()
         bm25_pt_scores = model_pt.score_batch(queries_lst)
         bm25_pt_scores = bm25_pt_scores.cpu().numpy()
-        bm25_pt_score_time = time.time() - start_time
+        bm25_pt_score_time = time.monotonic() - start_time
         bm25_pt_score_time -= time_query_tok
         print(f"bm25-pt score time: {bm25_pt_score_time:.4f}s")
 

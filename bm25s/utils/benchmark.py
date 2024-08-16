@@ -33,7 +33,7 @@ class Timer:
     def start(self, name):
         if name in self.results:
             raise ValueError(f"Timer with name {name} already started.")
-        start_time = time.time()
+        start_time = time.monotonic()
         self.results[name] = {"start": start_time, "elapsed": 0, "last": start_time}
         return name
 
@@ -41,7 +41,7 @@ class Timer:
         if name not in self.results:
             raise ValueError(f"Timer with name {name} not started.")
 
-        stop_time = time.time()
+        stop_time = time.monotonic()
         r = self.results[name]
         r["stopped"] = stop_time
         r["elapsed"] += stop_time - r.pop("last")
@@ -58,7 +58,7 @@ class Timer:
         # if not self.has_started(name):
         #     raise ValueError(f"Timer with name {name} not started.")
 
-        paused_time = time.time()
+        paused_time = time.monotonic()
         r = self.results[name]
 
         r["elapsed"] += paused_time - r["last"]
@@ -73,7 +73,7 @@ class Timer:
         # if self.has_stopped(name):
         #     raise ValueError(f"Timer with name {name} already stopped.")
 
-        self.results[name]["last"] = time.time()
+        self.results[name]["last"] = time.monotonic()
 
     def is_paused(self, name):
         return name in self.results and "paused" in self.results[name]
