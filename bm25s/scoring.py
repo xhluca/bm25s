@@ -325,3 +325,28 @@ def _compute_relevance_from_scores_legacy(
     np.add.at(scores, indices_flat, scores_flat)
 
     return scores
+
+def _compute_relevance_from_scores_jit_ready(
+    data: np.ndarray,
+    indptr: np.ndarray,
+    indices: np.ndarray,
+    num_docs: int,
+    query_tokens_ids: np.ndarray,
+    dtype: np.dtype,
+) -> np.ndarray:
+    """
+    This internal static function calculates the relevance scores for a given query,
+    by using the BM25 scores that have been precomputed in the BM25 eager index.
+    This version is ready for JIT compilation with numba, but is slow if not compiled.
+    """
+    indptr_starts = indptr[query_tokens_ids]
+    indptr_ends = indptr[query_tokens_ids + 1]
+
+    scores = np.zeros(num_docs, dtype=dtype)
+    for i in range(len(query_tokens_ids)):
+        start, end = indptr_starts[i], indptr_ends[i]
+        # The following code is slower with numpy, but faster after JIT compilation
+        for j in range(start, end):
+            scores[indices[j]] += data[j]
+
+    return scores
