@@ -198,7 +198,7 @@ class BM25:
         Returns
         -------
         np.ndarray
-            Array of BM25 scores.
+            Array of BM25 relevance scores for a given query.
         
         Note
         ----
@@ -211,7 +211,8 @@ class BM25:
         scores = np.zeros(num_docs, dtype=dtype)
         for i in range(len(query_tokens_ids)):
             start, end = indptr_starts[i], indptr_ends[i]
-            scores[indices[start:end]] += data[start:end]
+            np.add.at(scores, indices[start:end], data[start:end])
+
             # # The following code is slower with numpy, but faster after JIT compilation
             # for j in range(start, end):
             #     scores[indices[j]] += data[j]
