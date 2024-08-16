@@ -11,7 +11,7 @@ from numba import njit
 
 
 @njit()
-def _numba_unsorted_top_k(array: np.ndarray, k: int):
+def _numba_unsorted_top_k_legacy(array: np.ndarray, k: int):
     top_k_values = np.zeros(k, dtype=np.float32)
     top_k_indices = np.zeros(k, dtype=np.int32)
 
@@ -103,30 +103,40 @@ def _numba_sorted_top_k(array: np.ndarray, k: int):
                 indices[0] = i
                 sift_up(values, indices, 0, length)
 
-    top_k_values = np.zeros(k, dtype=array.dtype)
-    top_k_indices = np.zeros(k, dtype=np.int32)
+    # # This is the original code for sorting, we can skip it and return the values and indices
+    # # to let numpy handle the sorting
+    # top_k_values = np.zeros(k, dtype=array.dtype)
+    # top_k_indices = np.zeros(k, dtype=np.int32)
 
-    for i in range(k - 1, -1, -1):
-        top_k_values[i], top_k_indices[i] = heap_pop(values, indices, length)
-        length -= 1
+    # for i in range(k - 1, -1, -1):
+    #     top_k_values[i], top_k_indices[i] = heap_pop(values, indices, length)
+    #     length -= 1
 
-    return top_k_values, top_k_indices
+    # return top_k_values, top_k_indices
+
+    return values, indices
 
 
-def topk(query_scores, k, backend="numba_sorted", sorted=None):
+def topk(query_scores, k, backend="numba", sorted=True):
     """
     This function is used to retrieve the top-k results for a single query. It will only work
     on a 1-dimensional array of scores.
-
-    Note: sorted is ignored
     """
-    if backend not in ["numba_unsorted", "numba_sorted"]:
+    if backend not in ["numba"]:
         raise ValueError(
-            "Invalid backend. Please choose from 'numba_unsorted' or 'numba_sorted'."
+            "Invalid backend. Only 'numba' is supported."
         )
-    elif backend == "numba_unsorted":
-        return _numba_unsorted_top_k(query_scores, k)
-    elif backend == "numba_sorted":
-        return _numba_sorted_top_k(query_scores, k)
+    elif backend == "numba":
+        uns_scores, uns_indices = _numba_sorted_top_k(query_scores, k)
+        if sorted:
+            sorted_inds = np.flip(np.argsort(uns_scores))
+            query_inds = uns_indices[sorted_inds]
+            query_scores = uns_scores[sorted_inds]
+        else:
+            query_inds = uns_indices
+            query_scores = uns_scores
+        
+        return query_scores, query_inds
+
     else:
-        raise ValueError("Invalid backend.")
+        raise ValueError("Invalid backend. Only 'numba' is supported.")
