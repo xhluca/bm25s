@@ -1,4 +1,4 @@
-STOPWORDS_EN = (
+STOPWORDS_EN_PLUS = (
     "a",
     "about",
     "above",

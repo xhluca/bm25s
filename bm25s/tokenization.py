@@ -10,7 +10,7 @@ except ImportError:
 
 
 from .stopwords import (
-    STOPWORDS_EN,
+    STOPWORDS_EN_PLUS,
     STOPWORDS_GERMAN,
     STOPWORDS_DUTCH,
     STOPWORDS_FRENCH,
