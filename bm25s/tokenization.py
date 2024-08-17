@@ -10,6 +10,7 @@ except ImportError:
 
 
 from .stopwords import (
+    STOPWORDS_EN,
     STOPWORDS_EN_PLUS,
     STOPWORDS_GERMAN,
     STOPWORDS_DUTCH,
@@ -49,6 +50,8 @@ def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
 def _infer_stopwords(stopwords: Union[str, List[str]]) -> List[str]:
     if stopwords in ["english", "en", True]: # True is added to support the default
         return STOPWORDS_EN
+    elif stopwords in ["english_plus", "en_plus"]:
+        return STOPWORDS_EN_PLUS
     elif stopwords in ["german", "de"]:
         return STOPWORDS_GERMAN
     elif stopwords in ["dutch", "nl"]:
