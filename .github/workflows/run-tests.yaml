@@ -32,7 +32,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r tests/requirements-core.txt
     
-    - name: Run comparison tests with dependencies
+    - name: Run core tests with dependencies
       run: |
         python -m unittest tests/core/test_*.py
     
