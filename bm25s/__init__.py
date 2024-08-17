@@ -14,6 +14,10 @@ try:
 except ImportError:
     import json
 
+try:
+    from .numba import selection as selection_jit
+except ImportError:
+    selection_jit = None
 
 def _faketqdm(iterable, *args, **kwargs):
     return iterable
@@ -85,34 +89,6 @@ def _is_tuple_of_list_of_tokens(obj):
         return False
     
     return True
-    
-
-def _calculate_scores_with_arrays(
-    data, indptr, indices, num_docs, query_tokens_ids, dtype
-):
-    # First, we use the query_token_ids to select the relevant columns from the score_matrix
-    query_tokens_ids = np.array(query_tokens_ids, dtype=int)
-    indptr_starts = indptr[query_tokens_ids]
-    indptr_ends = indptr[query_tokens_ids + 1]
-
-    scores_lists = []
-    indices_lists = []
-
-    for i, (start, end) in enumerate(zip(indptr_starts, indptr_ends)):
-        scores_lists.append(data[start:end])
-        indices_lists.append(indices[start:end])
-
-    # combine the lists into a single array
-
-    scores = np.zeros(num_docs, dtype=dtype)
-    if len(scores_lists) == 0:
-        return scores
-
-    scores_flat = np.concatenate(scores_lists)
-    indices_flat = np.concatenate(indices_lists)
-    np.add.at(scores, indices_flat, scores_flat)
-
-    return scores
 
 
 class BM25:
@@ -192,6 +168,60 @@ class BM25:
             raise ValueError(
                 "Corpus must be a list of list of tokens, an object with the `ids` and `vocab` attributes, or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
             )
+
+    @staticmethod
+    def _compute_relevance_from_scores(
+        data: np.ndarray,
+        indptr: np.ndarray,
+        indices: np.ndarray,
+        num_docs: int,
+        query_tokens_ids: np.ndarray,
+        dtype: np.dtype,
+    ) -> np.ndarray:
+        """
+        This internal static function calculates the relevance scores for a given query,
+        by using the BM25 scores that have been precomputed in the BM25 eager index.
+        It is used by the `get_scores_from_ids` method, which makes use of the precomputed
+        scores assigned as attributes of the BM25 object.
+        
+        Parameters
+        ----------
+        data (np.ndarray)
+            Data array of the BM25 index.
+        indptr (np.ndarray)
+            Index pointer array of the BM25 index.
+        indices (np.ndarray)
+            Indices array of the BM25 index.
+        num_docs (int)
+            Number of documents in the BM25 index.
+        query_tokens_ids (np.ndarray)
+            Array of token IDs to score.
+        dtype (np.dtype)
+            Data type for score calculation.
+
+        Returns
+        -------
+        np.ndarray
+            Array of BM25 relevance scores for a given query.
+        
+        Note
+        ----
+        This function was optimized by the baguetter library. The original implementation can be found at:
+        https://github.com/mixedbread-ai/baguetter/blob/main/baguetter/indices/sparse/models/bm25/index.py
+        """
+        indptr_starts = indptr[query_tokens_ids]
+        indptr_ends = indptr[query_tokens_ids + 1]
+
+        scores = np.zeros(num_docs, dtype=dtype)
+        for i in range(len(query_tokens_ids)):
+            start, end = indptr_starts[i], indptr_ends[i]
+            np.add.at(scores, indices[start:end], data[start:end])
+
+            # # The following code is slower with numpy, but faster after JIT compilation
+            # for j in range(start, end):
+            #     scores[indices[j]] += data[j]
+
+        return scores
 
     def build_index_from_ids(
         self,
@@ -388,20 +418,24 @@ class BM25:
         return [
             self.vocab_dict[token] for token in query_tokens if token in self.vocab_dict
         ]
-
+    
     def get_scores_from_ids(self, query_tokens_ids: List[int]) -> np.ndarray:
         data = self.scores["data"]
         indices = self.scores["indices"]
         indptr = self.scores["indptr"]
         num_docs = self.scores["num_docs"]
 
-        scores = _calculate_scores_with_arrays(
+        dtype = np.dtype(self.dtype)
+        int_dtype = np.dtype(self.int_dtype)
+        query_tokens_ids = np.asarray(query_tokens_ids, dtype=int_dtype)
+
+        scores = self._compute_relevance_from_scores(
             data=data,
             indptr=indptr,
             indices=indices,
             num_docs=num_docs,
             query_tokens_ids=query_tokens_ids,
-            dtype=self.dtype,
+            dtype=dtype,
         )
 
         # if there's a non-occurrence array, we need to add the non-occurrence score
@@ -429,9 +463,16 @@ class BM25:
         may change in the future. Please use the `retrieve` function instead.
         """
         scores_q = self.get_scores(query_tokens_single)
-        topk_scores, topk_indices = selection.topk(
-            scores_q, k=k, sorted=sorted, backend=backend
-        )
+        if backend.startswith('numba'):
+            if selection_jit is None:
+                raise ImportError("Numba is not installed. Please install numba to use the numba backend.")
+            topk_scores, topk_indices = selection_jit.topk(
+                scores_q, k=k, sorted=sorted, backend=backend
+            )
+        else:
+            topk_scores, topk_indices = selection.topk(
+                scores_q, k=k, sorted=sorted, backend=backend
+            )
 
         return topk_scores, topk_indices
 
@@ -828,3 +869,30 @@ class BM25:
             bm25_obj.nonoccurrence_array = None
 
         return bm25_obj
+
+    def activate_numba_scorer(self):
+        """
+        Activate the Numba scorer for the BM25 index. This will apply the Numba JIT
+        compilation to the `_compute_relevance_from_scores` function, which will speed
+        up the scoring process. This will have an impact when you call the `retrieve`
+        method and the `get_scores` method. The first time you call the `retrieve` method,
+        it will be slower, as the function will be compiled on the spot. However, subsequent calls
+        will be faster.
+
+        This function requires the `numba` package to be installed. If it is not installed,
+        an ImportError will be raised. You can install Numba with `pip install numba`.
+
+        Behind the scenes, this will reassign the `_compute_relevance_from_scores` method
+        to the JIT-compiled version of the function.
+        """
+        try:
+            from numba import njit
+        except ImportError:
+            raise ImportError(
+                "Numba is not installed. Please install Numba to compile the Numba scorer with `pip install numba`."
+            )
+
+        from .scoring import _compute_relevance_from_scores_jit_ready
+
+        self._compute_relevance_from_scores = njit(_compute_relevance_from_scores_jit_ready)
+        
