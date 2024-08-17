@@ -9,4 +9,3 @@ pyserini
 git+https://github.com/dorianbrown/rank_bm25@1abce6cb8bd4a4961f0958391b3eabb749483c01
 bm25_pt
 nltk
-numba
