@@ -869,3 +869,30 @@ class BM25:
             bm25_obj.nonoccurrence_array = None
 
         return bm25_obj
+
+    def activate_numba_scorer(self):
+        """
+        Activate the Numba scorer for the BM25 index. This will apply the Numba JIT
+        compilation to the `_compute_relevance_from_scores` function, which will speed
+        up the scoring process. This will have an impact when you call the `retrieve`
+        method and the `get_scores` method. The first time you call the `retrieve` method,
+        it will be slower, as the function will be compiled on the spot. However, subsequent calls
+        will be faster.
+
+        This function requires the `numba` package to be installed. If it is not installed,
+        an ImportError will be raised. You can install Numba with `pip install numba`.
+
+        Behind the scenes, this will reassign the `_compute_relevance_from_scores` method
+        to the JIT-compiled version of the function.
+        """
+        try:
+            from numba import njit
+        except ImportError:
+            raise ImportError(
+                "Numba is not installed. Please install Numba to compile the Numba scorer with `pip install numba`."
+            )
+
+        from .scoring import _compute_relevance_from_scores_jit_ready
+
+        self._compute_relevance_from_scores = njit(_compute_relevance_from_scores_jit_ready)
+        
