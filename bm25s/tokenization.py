@@ -48,6 +48,7 @@ def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
 
 
 def _infer_stopwords(stopwords: Union[str, List[str]]) -> List[str]:
+    # Source of stopwords: https://github.com/nltk/nltk/blob/96ee715997e1c8d9148b6d8e1b32f412f31c7ff7/nltk/corpus/__init__.py#L315
     if stopwords in ["english", "en", True]: # True is added to support the default
         return STOPWORDS_EN
     elif stopwords in ["english_plus", "en_plus"]:
