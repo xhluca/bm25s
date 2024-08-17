@@ -6,9 +6,7 @@ import tempfile
 import bm25s
 import Stemmer  # optional: for stemming
 
-from .. import BM25TestCase
-
-class TestBM25SLoadingSaving(BM25TestCase):
+class TestBM25SLoadingSaving(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
 

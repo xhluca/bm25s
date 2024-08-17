@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  setup:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,25 +18,52 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: '3.10'
+    
+    - name: Install core dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements-core.txt
 
+  test-core:
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+    - name: Run comparison tests with dependencies
+      run: |
+        python -m unittest tests/core/test_*.py
+    
+  test-comparison:
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+    - name: Install comparison dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements-comparison.txt
+    
     - name: Cache Python dependencies
       uses: actions/cache@v2
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('tests/requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('tests/requirements-comparison.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
-    - name: Install dependencies
+    - name: Run comparison tests with dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r tests/requirements.txt  # Assumes you have a requirements.txt file
+        python -m unittest tests/comparison/test_*.py
+    
+  test-numba:
+    runs-on: ubuntu-latest
+    needs: setup
 
-    - name: Run quick tests
-      run: |
-        python -m unittest tests/quick/test_*.py
-  
-    - name: Run numba tests
+    steps:
+    - name: Install Numba
       run: |
         pip install "numba>=0.60.0"
+
+    - name: Run numba tests
+      run: |
         python -m unittest tests/numba/test_*.py
