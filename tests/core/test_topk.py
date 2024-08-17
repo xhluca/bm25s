@@ -47,7 +47,7 @@ class TestTopKSingleQuery(unittest.TestCase):
     @unittest.skipUnless(JAX_IS_AVAILABLE, "JAX is not available")
     def test_topk_jax_unsorted(self):
         result_scores, result_indices = topk(jnp.array(self.scores), self.k, backend="jax", sorted=False)
-        self.check_results(result_scores, result_indices, sorted=False)
+        self.check_results(result_scores, result_indices, sorted=True)
 
     def test_topk_auto_backend(self):
         result_scores, result_indices = topk(self.scores, self.k, backend="auto", sorted=True)
