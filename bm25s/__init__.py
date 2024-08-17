@@ -15,10 +15,9 @@ except ImportError:
     import json
 
 try:
-    from . import selection_numba
+    from .numba import selection as selection_jit
 except ImportError:
-    breakpoint()
-    selection_numba = None
+    selection_jit = None
 
 def _faketqdm(iterable, *args, **kwargs):
     return iterable
@@ -465,9 +464,9 @@ class BM25:
         """
         scores_q = self.get_scores(query_tokens_single)
         if backend.startswith('numba'):
-            if selection_numba is None:
+            if selection_jit is None:
                 raise ImportError("Numba is not installed. Please install numba to use the numba backend.")
-            topk_scores, topk_indices = selection_numba.topk(
+            topk_scores, topk_indices = selection_jit.topk(
                 scores_q, k=k, sorted=sorted, backend=backend
             )
         else:
