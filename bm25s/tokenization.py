@@ -85,7 +85,7 @@ def _infer_stopwords(stopwords: Union[str, List[str]]) -> List[str]:
 
 
 def tokenize(
-    texts,
+    texts: Union[str, List[str]],
     lower: bool = True,
     token_pattern: str = r"(?u)\b\w\w+\b",
     stopwords: Union[str, List[str]] = "english",
