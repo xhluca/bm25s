@@ -35,3 +35,8 @@ jobs:
     - name: Run quick tests
       run: |
         python -m unittest tests/quick/test_*.py
+  
+    - name: Run numba tests
+      run: |
+        pip install "numba>=0.60.0"
+        python -m unittest tests/numba/test_*.py
