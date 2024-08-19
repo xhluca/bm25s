@@ -50,6 +50,9 @@ Below, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25
 
 </details>
 
+> [!IMPORTANT]
+> BM25S just got faster! We are currently testing out integration with numba, which would make it up to [2x faster for larger datasets](https://github.com/xhluca/bm25-benchmarks?tab=readme-ov-file#queries-per-second)! Learn more about it and share your thoughts in [this discussion thread](https://github.com/xhluca/bm25s/discussions/46).
+
 ## Installation
 
 You can install `bm25s` with pip:
