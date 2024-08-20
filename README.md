@@ -360,6 +360,11 @@ When testing with 6 arbitrary queries with an index built with MS MARCO (8.8M do
 
 When you run `bm25s` on 1000 queries on the Natural Questions dataset (2M+ documents), the memory usage is over 50% lower than the in-memory version with trivial difference in speed. You can find more information in the [GitHub repository](https://github.com/xhluca/bm25s).
 
+## Acknowledgement
+
+* The multilingual stopwords are sourced from the [NLTK stopwords lists](https://github.com/nltk/nltk/blob/96ee715997e1c8d9148b6d8e1b32f412f31c7ff7/nltk/corpus/__init__.py#L315).
+* The numba implementation are inspired by numba implementations originally proposed by [baguetter](https://github.com/mixedbread-ai/baguetter) and [retriv](https://github.com/AmenRa/retriv).
+
 ## Citation
 
 If you use `bm25s` in your work, please use the following bibtex:
