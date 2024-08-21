@@ -476,6 +476,125 @@ class BM25:
 
         return topk_scores, topk_indices
 
+    def retrieve_numba(
+        self, 
+        query_tokens,
+        corpus: List[Any] = None,
+        k: int = 10,
+        sorted: bool = True,
+        return_as: str = "tuple",
+        show_progress: bool = True,
+        leave_progress: bool = False,
+        n_threads: int = 0,
+        chunksize: int = 50,
+        backend_selection=None,
+    ):
+        from numba import get_num_threads, set_num_threads, njit
+        from .numba.retrieve_utils import _retrieve_internal_jittable
+
+        allowed_return_as = ["tuple", "documents"]
+
+        if return_as not in allowed_return_as:
+            raise ValueError("`return_as` must be either 'tuple' or 'documents'")
+        else:
+            pass
+
+        if n_threads == -1:
+            n_threads = os.cpu_count()
+        elif n_threads == 0:
+            n_threads = 1
+        
+        # get og thread count
+        og_n_threads = get_num_threads()
+        set_num_threads(n_threads)
+
+        if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
+            if len(query_tokens) != 2:
+                msg = (
+                    "Expected a list of string or a tuple of two elements: the first element is the "
+                    "list of unique token IDs, "
+                    "and the second element is the list of token IDs for each document."
+                    f"Found {len(query_tokens)} elements instead."
+                )
+                raise ValueError(msg)
+            else:
+                ids, vocab = query_tokens
+                if not isinstance(ids, Iterable):
+                    raise ValueError(
+                        "The first element of the tuple passed to retrieve must be an iterable."
+                    )
+                if not isinstance(vocab, dict):
+                    raise ValueError(
+                        "The second element of the tuple passed to retrieve must be a dictionary."
+                    )
+                query_tokens = tokenization.Tokenized(ids=ids, vocab=vocab)
+
+        if isinstance(query_tokens, tokenization.Tokenized):
+            query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
+
+        tqdm_kwargs = {
+            "total": len(query_tokens),
+            "desc": "BM25S Retrieve",
+            "leave": leave_progress,
+            "disable": not show_progress,
+        }
+
+        query_tokens_ids = [
+            self.get_tokens_ids(q) for q in query_tokens
+        ]
+
+        # # retrieval starts here
+        # scores = np.zeros((len(query_tokens), k), dtype=self.dtype)
+        # indices = np.zeros((len(query_tokens), k), dtype=self.int_dtype)
+        
+        # for i in range(len(query_tokens)):
+        #     query_tokens_single = query_tokens[i]
+        #     query_scores = self.get_scores(query_tokens_single)
+        #     topk_query_scores, topk_query_inds = selection_jit._numba_sorted_top_k(
+        #         query_scores, k=k, sorted=sorted
+        #     )
+        #     scores[i] = topk_query_scores
+        #     indices[i] = topk_query_inds
+        # # retrieval has ended
+        scores, indices = _retrieve_internal_jittable(
+            query_tokens_ids=query_tokens_ids,
+            k=k,
+            sorted=sorted,
+            dtype=np.dtype(self.dtype),
+            int_dtype=np.dtype(self.int_dtype),
+            data=self.scores["data"],
+            indptr=self.scores["indptr"],
+            indices=self.scores["indices"],
+            num_docs=self.scores["num_docs"],
+            nonoccurrence_array=self.nonoccurrence_array,
+        )
+
+        # reset the number of threads
+        set_num_threads(og_n_threads)
+
+        corpus = corpus if corpus is not None else self.corpus
+
+        if corpus is None:
+            retrieved_docs = indices
+        else:
+            # if it is a JsonlCorpus object, we do not need to convert it to a list
+            if isinstance(corpus, utils.corpus.JsonlCorpus):
+                retrieved_docs = corpus[indices]
+            elif isinstance(corpus, np.ndarray) and corpus.ndim == 1:
+                retrieved_docs = corpus[indices]
+            else:
+                index_flat = indices.flatten().tolist()
+                results = [corpus[i] for i in index_flat]
+                retrieved_docs = np.array(results).reshape(indices.shape)
+
+        if return_as == "tuple":
+            return Results(documents=retrieved_docs, scores=scores)
+        elif return_as == "documents":
+            return retrieved_docs
+        else:
+            raise ValueError("`return_as` must be either 'tuple' or 'documents'")
+
+
     def retrieve(
         self,
         query_tokens: Union[List[List[str]], tokenization.Tokenized],
@@ -606,6 +725,8 @@ class BM25:
         else:
             # if it is a JsonlCorpus object, we do not need to convert it to a list
             if isinstance(corpus, utils.corpus.JsonlCorpus):
+                retrieved_docs = corpus[indices]
+            elif isinstance(corpus, np.ndarray) and corpus.ndim == 1:
                 retrieved_docs = corpus[indices]
             else:
                 index_flat = indices.flatten().tolist()
