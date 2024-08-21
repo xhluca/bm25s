@@ -490,7 +490,7 @@ class BM25:
         backend_selection=None,
     ):
         from numba import get_num_threads, set_num_threads, njit
-        from .numba.retrieve_utils import _retrieve_internal_jittable
+        from .numba.retrieve_utils import _retrieve_internal_numba_parallel
 
         allowed_return_as = ["tuple", "documents"]
 
@@ -543,21 +543,18 @@ class BM25:
             self.get_tokens_ids(q) for q in query_tokens
         ]
 
-        # # retrieval starts here
-        # scores = np.zeros((len(query_tokens), k), dtype=self.dtype)
-        # indices = np.zeros((len(query_tokens), k), dtype=self.int_dtype)
-        
-        # for i in range(len(query_tokens)):
-        #     query_tokens_single = query_tokens[i]
-        #     query_scores = self.get_scores(query_tokens_single)
-        #     topk_query_scores, topk_query_inds = selection_jit._numba_sorted_top_k(
-        #         query_scores, k=k, sorted=sorted
-        #     )
-        #     scores[i] = topk_query_scores
-        #     indices[i] = topk_query_inds
-        # # retrieval has ended
-        scores, indices = _retrieve_internal_jittable(
-            query_tokens_ids=query_tokens_ids,
+        # # convert query_tokens_ids to tuple of tuple
+        # query_tokens_ids = tuple(map(tuple, query_tokens_ids))
+
+        # convert query_tokens_ids from list of list to a flat 1-d np.ndarray with
+        # pointers to the start of each query to be used to find the boundaries of each query
+        query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=self.int_dtype)
+        query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(self.int_dtype)
+
+        scores, indices = _retrieve_internal_numba_parallel(
+            query_pointers=query_pointers,
+            query_tokens_ids_flat=query_tokens_ids_flat,
+            # query_tokens_ids=query_tokens_ids,
             k=k,
             sorted=sorted,
             dtype=np.dtype(self.dtype),
