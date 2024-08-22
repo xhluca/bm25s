@@ -226,3 +226,38 @@ def tokenize(
             corpus_ids[i] = [reverse_dict[token_id] for token_id in token_ids]
 
         return corpus_ids
+
+
+def _tokenize_with_vocab(
+    texts: Union[str, List[str]],
+    lower: bool = True,
+    token_pattern: str = r"(?u)\b\w\w+\b",
+    stopwords: Union[str, List[str]] = "english",
+    vocab_dict: dict = None,
+    show_progress: bool = True,
+    leave: bool = False,
+) -> Tokenized:
+    if isinstance(texts, str):
+        texts = [texts]
+
+    token_pattern = re.compile(token_pattern)
+    stopwords = _infer_stopwords(stopwords)
+
+    # Step 1: Split the strings using the regex pattern
+    split_fn = token_pattern.findall
+
+    corpus_ids = []
+    stopwords_set = set(stopwords)
+    for text in tqdm(
+        texts, desc="Split strings", leave=leave, disable=not show_progress
+    ):
+        if lower:
+            text = text.lower()
+
+        splitted = split_fn(text)
+        corpus_ids.append([
+            vocab_dict[token] for token in splitted if token not in stopwords_set and token in vocab_dict
+        ])
+
+    # Step 3: Return the tokenized IDs and the vocab dictionary or the tokenized strings
+    return Tokenized(ids=corpus_ids, vocab=vocab_dict)
