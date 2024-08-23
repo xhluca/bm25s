@@ -228,7 +228,7 @@ def tokenize(
         return corpus_ids
 
 
-def _tokenize_with_vocab(
+def _tokenize_with_vocab_exp(
     texts: Union[str, List[str]],
     lower: bool = True,
     token_pattern: str = r"(?u)\b\w\w+\b",
@@ -240,6 +240,9 @@ def _tokenize_with_vocab(
     if isinstance(texts, str):
         texts = [texts]
 
+    if vocab_dict is None:
+        raise ValueError("vocab_dict must be provided.")
+    
     token_pattern = re.compile(token_pattern)
     stopwords = _infer_stopwords(stopwords)
 
