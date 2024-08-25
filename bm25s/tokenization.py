@@ -255,9 +255,19 @@ def _tokenize_with_vocab_exp(
             text = text.lower()
 
         splitted = token_pattern.findall(text)
-        corpus_ids.append([
-            vocab_dict[token] for token in splitted if token not in stopwords_set and token in vocab_dict
-        ])
+
+        doc_ids = []
+
+        for token in splitted:
+            if token in stopwords_set:
+                continue
+
+            if token not in vocab_dict:
+                continue
+
+            doc_ids.append(vocab_dict[token])
+        
+        corpus_ids.append(doc_ids)
 
     # Step 3: Return the tokenized IDs and the vocab dictionary or the tokenized strings
     return corpus_ids
