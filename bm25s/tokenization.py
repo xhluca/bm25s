@@ -246,9 +246,6 @@ def _tokenize_with_vocab_exp(
     token_pattern = re.compile(token_pattern)
     stopwords = _infer_stopwords(stopwords)
 
-    # Step 1: Split the strings using the regex pattern
-    split_fn = token_pattern.findall
-
     corpus_ids = []
     stopwords_set = set(stopwords)
     for text in tqdm(
@@ -257,10 +254,10 @@ def _tokenize_with_vocab_exp(
         if lower:
             text = text.lower()
 
-        splitted = split_fn(text)
+        splitted = token_pattern.findall(text)
         corpus_ids.append([
             vocab_dict[token] for token in splitted if token not in stopwords_set and token in vocab_dict
         ])
 
     # Step 3: Return the tokenized IDs and the vocab dictionary or the tokenized strings
-    return Tokenized(ids=corpus_ids, vocab=vocab_dict)
+    return corpus_ids
