@@ -566,7 +566,7 @@ class BM25:
 
         if n_threads == -1:
             n_threads = os.cpu_count()
-    
+
 
         if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
             if len(query_tokens) != 2:
@@ -757,6 +757,7 @@ class BM25:
             int_dtype=self.int_dtype,
             num_docs=self.scores["num_docs"],
             version=__version__,
+            backend=self.backend,
         )
         with open(params_path, "w") as f:
             json.dump(params, f, indent=4)
