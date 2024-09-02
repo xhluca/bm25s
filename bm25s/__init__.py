@@ -19,6 +19,11 @@ try:
 except ImportError:
     selection_jit = None
 
+try:
+    from .numba.retrieve_utils import _retrieve_numba_functional
+except ImportError:
+    _retrieve_numba_functional = None
+
 def _faketqdm(iterable, *args, **kwargs):
     return iterable
 
@@ -102,6 +107,7 @@ class BM25:
         dtype="float32",
         int_dtype="int32",
         corpus=None,
+        backend="numpy",
     ):
         """
         BM25S initialization.
@@ -134,6 +140,13 @@ class BM25:
             The corpus of documents. This is optional and is used for saving the corpus
             to the snapshot. We expect the corpus to be a list of dictionaries, where each
             dictionary represents a document.
+        
+        backend : str
+            The backend used during retrieval. By default, it uses the numpy backend, which
+            only requires numpy and scipy as dependencies. You can also select `backend="numba"`
+            to use the numba backend, which requires the numba library. If you select `backend="auto"`,
+            the function will use the numba backend if it is available, otherwise it will use the numpy
+            backend.
         """
         self.k1 = k1
         self.b = b
@@ -145,6 +158,11 @@ class BM25:
         self.methods_requiring_nonoccurrence = ("bm25l", "bm25+")
         self.corpus = corpus
         self._original_version = __version__
+
+        if backend == "auto":
+            self.backend = "numba" if selection_jit is not None else "numpy"
+        else:
+            self.backend = backend
 
     @staticmethod
     def _infer_corpus_object(corpus):
@@ -476,121 +494,6 @@ class BM25:
 
         return topk_scores, topk_indices
 
-    def retrieve_numba(
-        self, 
-        query_tokens,
-        corpus: List[Any] = None,
-        k: int = 10,
-        sorted: bool = True,
-        return_as: str = "tuple",
-        show_progress: bool = True,
-        leave_progress: bool = False,
-        n_threads: int = 0,
-        chunksize: int = 50,
-        backend_selection=None,
-    ):
-        from numba import get_num_threads, set_num_threads, njit
-        from .numba.retrieve_utils import _retrieve_internal_numba_parallel
-
-        allowed_return_as = ["tuple", "documents"]
-
-        if return_as not in allowed_return_as:
-            raise ValueError("`return_as` must be either 'tuple' or 'documents'")
-        else:
-            pass
-
-        if n_threads == -1:
-            n_threads = os.cpu_count()
-        elif n_threads == 0:
-            n_threads = 1
-        
-        # get og thread count
-        og_n_threads = get_num_threads()
-        set_num_threads(n_threads)
-
-        if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
-            if len(query_tokens) != 2:
-                msg = (
-                    "Expected a list of string or a tuple of two elements: the first element is the "
-                    "list of unique token IDs, "
-                    "and the second element is the list of token IDs for each document."
-                    f"Found {len(query_tokens)} elements instead."
-                )
-                raise ValueError(msg)
-            else:
-                ids, vocab = query_tokens
-                if not isinstance(ids, Iterable):
-                    raise ValueError(
-                        "The first element of the tuple passed to retrieve must be an iterable."
-                    )
-                if not isinstance(vocab, dict):
-                    raise ValueError(
-                        "The second element of the tuple passed to retrieve must be a dictionary."
-                    )
-                query_tokens = tokenization.Tokenized(ids=ids, vocab=vocab)
-
-        if isinstance(query_tokens, tokenization.Tokenized):
-            query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
-
-        tqdm_kwargs = {
-            "total": len(query_tokens),
-            "desc": "BM25S Retrieve",
-            "leave": leave_progress,
-            "disable": not show_progress,
-        }
-
-        query_tokens_ids = [
-            self.get_tokens_ids(q) for q in query_tokens
-        ]
-
-        # # convert query_tokens_ids to tuple of tuple
-        # query_tokens_ids = tuple(map(tuple, query_tokens_ids))
-
-        # convert query_tokens_ids from list of list to a flat 1-d np.ndarray with
-        # pointers to the start of each query to be used to find the boundaries of each query
-        query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=self.int_dtype)
-        query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(self.int_dtype)
-
-        scores, indices = _retrieve_internal_numba_parallel(
-            query_pointers=query_pointers,
-            query_tokens_ids_flat=query_tokens_ids_flat,
-            # query_tokens_ids=query_tokens_ids,
-            k=k,
-            sorted=sorted,
-            dtype=np.dtype(self.dtype),
-            int_dtype=np.dtype(self.int_dtype),
-            data=self.scores["data"],
-            indptr=self.scores["indptr"],
-            indices=self.scores["indices"],
-            num_docs=self.scores["num_docs"],
-            nonoccurrence_array=self.nonoccurrence_array,
-        )
-
-        # reset the number of threads
-        set_num_threads(og_n_threads)
-
-        corpus = corpus if corpus is not None else self.corpus
-
-        if corpus is None:
-            retrieved_docs = indices
-        else:
-            # if it is a JsonlCorpus object, we do not need to convert it to a list
-            if isinstance(corpus, utils.corpus.JsonlCorpus):
-                retrieved_docs = corpus[indices]
-            elif isinstance(corpus, np.ndarray) and corpus.ndim == 1:
-                retrieved_docs = corpus[indices]
-            else:
-                index_flat = indices.flatten().tolist()
-                results = [corpus[i] for i in index_flat]
-                retrieved_docs = np.array(results).reshape(indices.shape)
-
-        if return_as == "tuple":
-            return Results(documents=retrieved_docs, scores=scores)
-        elif return_as == "documents":
-            return retrieved_docs
-        else:
-            raise ValueError("`return_as` must be either 'tuple' or 'documents'")
-
 
     def retrieve(
         self,
@@ -688,6 +591,37 @@ class BM25:
 
         if isinstance(query_tokens, tokenization.Tokenized):
             query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
+        
+        corpus = corpus if corpus is not None else self.corpus
+        
+        if self.backend == "numba":
+            if _retrieve_numba_functional is None:
+                raise ImportError("Numba is not installed. Please install numba wiith `pip install numba` to use the numba backend.")
+            
+            backend_selection = "numba" if backend_selection == "auto" else backend_selection
+            query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
+            res = _retrieve_numba_functional(
+                query_tokens_ids=query_tokens_ids,
+                scores=self.scores,
+                corpus=corpus,
+                k=k,
+                sorted=sorted,
+                return_as=return_as,
+                show_progress=show_progress,
+                leave_progress=leave_progress,
+                n_threads=n_threads,
+                chunksize=None, # chunksize is ignored in the numba backend
+                backend_selection=backend_selection, # backend_selection is ignored in the numba backend
+                dtype=self.dtype,
+                int_dtype=self.int_dtype,
+                nonoccurrence_array=self.nonoccurrence_array
+            )
+
+            if return_as == "tuple":
+                return Results(documents=res[0], scores=res[1])
+            else:
+                return res
+
 
         tqdm_kwargs = {
             "total": len(query_tokens),
