@@ -7,10 +7,9 @@ from .selection import _numba_sorted_top_k
 _compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
 
 @njit(parallel=True)
-def _retrieve_internal_numba_parallel(
+def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,
-    # query_tokens_ids: Tuple[Tuple[int]],
     k: int,
     sorted: bool,
     dtype: np.dtype,
@@ -22,16 +21,14 @@ def _retrieve_internal_numba_parallel(
     nonoccurrence_array: np.ndarray = None,
 ):
     N = len(query_pointers) - 1
-    # N = len(query_tokens_ids)
 
     topk_scores = np.zeros((N, k), dtype=dtype)
     topk_indices = np.zeros((N, k), dtype=int_dtype)
 
     for i in prange(N):
         query_tokens_single = query_tokens_ids_flat[query_pointers[i] : query_pointers[i + 1]]
-        # query_tokens_single = query_tokens_ids[i]
 
-        query_tokens_single = np.asarray(query_tokens_single, dtype=int_dtype)
+        # query_tokens_single = np.asarray(query_tokens_single, dtype=int_dtype)
         scores_single = _compute_relevance_from_scores_jit_ready(
             query_tokens_ids=query_tokens_single,
             data=data,
