@@ -56,7 +56,7 @@ def find_newline_positions(path, show_progress=True, leave_progress=True):
 def save_mmindex(indexes, path):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
-    with open(index_file, "w") as f:
+    with open(index_file, "wb") as f:
         f.write(json.dumps(indexes))
 
 
@@ -185,10 +185,16 @@ class JsonlCorpus:
         Close the file and mmap objects. This is useful if you want to free up memory. To reopen them, use the `load` method.
         If you don't call this method, the objects will be closed automatically when the object is deleted.
         """
-        if hasattr(self, "file_obj"):
+        if hasattr(self, "file_obj") and self.file_obj is not None:
             self.file_obj.close()
-        if hasattr(self, "mmap_obj"):
+            # delete the object
+            del self.file_obj
+            self.file_obj = None
+        if hasattr(self, "mmap_obj") and self.mmap_obj is not None:
             self.mmap_obj.close()
+            # delete the object
+            del self.mmap_obj
+            self.mmap_obj = None
         if self.verbosity >= 1:
             logging.info("Closed file and mmap objects")
     
