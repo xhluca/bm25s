@@ -63,21 +63,22 @@ class Tokenizer:
         self.reset_vocab()
 
     def reset_vocab(self):
-        self.word_to_wid = {}  # word -> id, e.g. "apple" -> 2
+        self._word_to_wid = {}  # word -> id, e.g. "apple" -> 2
         self.word_to_stem = {}  # word -> stemmed word, e.g. "apple" -> "appl"
         self.stem_to_sid = {}  # stem -> stemmed id, e.g. "appl" -> 0
-        self.word_to_sid = {}  # word -> stem, e.g. "apple" -> "appl"
+        self.word_to_id = {}  # word -> {stemmed, word} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
         self.vocab = {
-            "word_to_wid": self.word_to_wid,
             "word_to_stem": self.word_to_stem,
             "stem_to_sid": self.stem_to_sid,
-            "word_to_sid": self.word_to_sid,
+            "word_to_id": self.word_to_id,
         }
 
     def streaming_tokenize(self, texts: List[str], update_vocab: bool = True):
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
 
-        # manually increment tqdm
+        if self.stemmer is None:
+            self.word_to_id = self._word_to_wid
+        
         for text in texts:
             if self.lower:
                 text = text.lower()
@@ -88,13 +89,13 @@ class Tokenizer:
                 if stopwords_set is not None and word in stopwords_set:
                     continue
 
-                if word not in self.word_to_wid:
+                if word not in self.word_to_id:
                     # when we are not updating the vocab, we just skip this word
                     if not update_vocab:
                         continue
 
-                    # else if we are updating the vocab, we need to add it to word_to_wid
-                    self.word_to_wid[word] = len(self.word_to_wid)
+                    # else if we are updating the vocab, we need to add it to _word_to_wid
+                    self._word_to_wid[word] = len(self._word_to_wid)
 
                     if self.stemmer is not None:
                         if word not in self.word_to_stem:
@@ -107,10 +108,10 @@ class Tokenizer:
                             self.stem_to_sid[stem] = len(self.stem_to_sid)
 
                         sid = self.stem_to_sid[stem]
-                        self.word_to_sid[word] = sid
+                        self.word_to_id[word] = sid
 
-                doc_id = self.word_to_wid[word]
-                doc_ids.append(doc_id)
+                wid = self.word_to_id[word]  # if stemmer is None, this is the same as wid
+                doc_ids.append(wid)
 
             yield doc_ids
 
