@@ -7,6 +7,7 @@ except ImportError:
     def tqdm(iterable, *args, **kwargs):
         return iterable
 
+from . import json_functions
 
 BASE_URL = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip"
 
@@ -38,8 +39,6 @@ def postprocess_results_for_eval(results, scores, query_ids):
 
 
 def merge_cqa_dupstack(data_path):
-    import json
-
     data_path = Path(data_path)
     dataset = data_path.name
     assert dataset == "cqadupstack", "Dataset must be CQADupStack"
@@ -59,11 +58,11 @@ def merge_cqa_dupstack(data_path):
                     for line in tqdm(
                         f2, desc=f"Merging {corpus_name} Corpus", leave=False
                     ):
-                        line = json.loads(line)
+                        line = json_functions.loads(line)
                         # add the corpus name to _id
                         line["_id"] = f"{corpus_name}_{line['_id']}"
                         # write back to file
-                        f.write(json.dumps(line))
+                        f.write(json_functions.dumps(line))
                         f.write("\n")
 
     # now, do the same for queries.jsonl
@@ -79,11 +78,11 @@ def merge_cqa_dupstack(data_path):
                     for line in tqdm(
                         f2, desc=f"Merging {corpus_name} Queries", leave=False
                     ):
-                        line = json.loads(line)
+                        line = json_functions.loads(line)
                         # add the corpus name to _id
                         line["_id"] = f"{corpus_name}_{line['_id']}"
                         # write back to file
-                        f.write(json.dumps(line))
+                        f.write(json_functions.dumps(line))
                         f.write("\n")
 
     # now, do the same for qrels/test.tsv

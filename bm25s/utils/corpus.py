@@ -17,6 +17,8 @@ except ImportError:
     def tqdm(iterable=None, *args, **kwargs):
         return iterable
 
+from . import json_functions
+
 def change_extension(path, new_extension):
     path = str(path)
     return path.rpartition(".")[0] + new_extension
@@ -52,15 +54,15 @@ def find_newline_positions(path, show_progress=True, leave_progress=True):
 def save_mmindex(indexes, path):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
-    with open(index_file, "wb") as f:
-        f.write(json.dumps(indexes))
+    with open(index_file, "w") as f:
+        f.write(json_functions.dumps(indexes))
 
 
 def load_mmindex(path):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
-    with open(index_file, "rb") as f:
-        return json.loads(f.read())
+    with open(index_file, "r") as f:
+        return json_functions.loads(f.read())
 
 
 # now we can jump to any line in the file thanks to the index and mmap
@@ -71,7 +73,7 @@ def get_line(
     encoding="utf-8",
     file_obj=None,
     mmap_obj=None,
-):
+) -> str:
     path = str(path)
     if file_obj is None:
         file_obj = open(path, "r")
@@ -151,7 +153,7 @@ class JsonlCorpus:
     def __getitem__(self, index):
         # handle multiple indices
         if isinstance(index, int):
-            return json.loads(
+            return json_functions.loads(
                 get_line(
                     self.path,
                     index,

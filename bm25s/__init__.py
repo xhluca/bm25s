@@ -10,10 +10,7 @@ from typing import Any, Tuple, Dict, Iterable, List, NamedTuple, Union
 
 import numpy as np
 
-try:
-    import orjson
-except ImportError:
-    orjson = None
+from .utils import json_functions as json_functions
 
 try:
     from .numba import selection as selection_jit
@@ -743,11 +740,8 @@ class BM25:
         # Save the vocab dictionary
         vocab_path = save_dir / vocab_name
 
-        with open(vocab_path, "wb") as f:
-            if orjson is None:
-                json.dump(self.vocab_dict, f, indent=4)
-            else:
-                f.write(orjson.dumps(self.vocab_dict))
+        with open(vocab_path, "w") as f:
+            f.write(json_functions.dumps(self.vocab_dict))
 
         # Save the parameters
         params_path = save_dir / params_name
@@ -768,11 +762,6 @@ class BM25:
 
         corpus = corpus if corpus is not None else self.corpus
 
-        if orjson is None:
-            json_dumps = lambda doc: json.dumps(doc)
-        else:
-            json_dumps = lambda doc: orjson.dumps(doc).decode("utf-8")
-        
         if corpus is not None:
             with open(save_dir / corpus_name, "w") as f:
                 # if it's not an iterable, we skip
@@ -793,7 +782,7 @@ class BM25:
                         continue
 
                     try:
-                        doc_str = json_dumps(doc)
+                        doc_str = json_functions.dumps(doc)
                     except Exception as e:
                         logging.warning(f"Error saving document at index {i}: {e}")
                     else:
@@ -870,15 +859,12 @@ class BM25:
         # Load the parameters
         params_path = save_dir / params_name
         with open(params_path, "r") as f:
-            params: dict = json.loads(f.read())
+            params: dict = json_functions.loads(f.read())
 
         # Load the vocab dictionary
         vocab_path = save_dir / vocab_name
         with open(vocab_path, "r") as f:
-            if orjson is not None:
-                vocab_dict = orjson.loads(f.read())
-            else:
-                vocab_dict = json.load(f)
+            vocab_dict: dict = json_functions.loads(f.read())
 
         # Load the score arrays
         data_path = save_dir / data_name
@@ -904,11 +890,6 @@ class BM25:
         bm25_obj.vocab_dict = vocab_dict
         bm25_obj._original_version = original_version
 
-        if orjson is None:
-            json_fast = json
-        else:
-            json_fast = orjson
-        
         if load_corpus:
             # load the model from the snapshot
             # if a corpus.jsonl file exists, load it
@@ -920,7 +901,7 @@ class BM25:
                     corpus = []
                     with open(corpus_file, "r") as f:
                         for line in f:
-                            doc = json_fast.loads(line)
+                            doc = json_functions.loads(line)
                             corpus.append(doc)
 
                 bm25_obj.corpus = corpus
