@@ -865,12 +865,12 @@ class BM25:
         # Load the parameters
         params_path = save_dir / params_name
         with open(params_path, "r") as f:
-            params: dict = json.load(f)
+            params: dict = json.loads(f.read())
 
         # Load the vocab dictionary
         vocab_path = save_dir / vocab_name
         with open(vocab_path, "r") as f:
-            vocab_dict = json_fast.load(f)
+            vocab_dict = json_fast.loads(f.read())
 
         # Load the score arrays
         data_path = save_dir / data_name
