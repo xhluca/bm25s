@@ -36,6 +36,148 @@ class Tokenized(NamedTuple):
     vocab: Dict[str, int]
 
 
+class Tokenizer:
+    def __init__(
+        self,
+        lower: bool = True,
+        splitter: str = r"(?u)\b\w\w+\b",
+        stopwords: Union[str, List[str]] = "english",
+        stemmer: Callable = None,
+    ):
+        self.lower = lower
+        if isinstance(splitter, str):
+            splitter = re.compile(splitter).findall
+        if not callable(splitter):
+            raise ValueError("splitter must be a callable or a regex pattern.")
+
+        # Exception handling for stemmer when we are using PyStemmer, which has a stemWords method
+        if hasattr(stemmer, "stemWord"):
+            stemmer = stemmer.stemWord
+        if not callable(stemmer) and stemmer is not None:
+            raise ValueError("stemmer must be callable or have a `stemWord` method.")
+
+        self.stopwords = _infer_stopwords(stopwords)
+        self.splitter = splitter
+        self.stemmer = stemmer
+
+        self.reset_vocab()
+
+    def reset_vocab(self):
+        self.word_to_wid = {}  # word -> id, e.g. "apple" -> 2
+        self.word_to_stem = {}  # word -> stemmed word, e.g. "apple" -> "appl"
+        self.stem_to_sid = {}  # stem -> stemmed id, e.g. "appl" -> 0
+        self.word_to_sid = {}  # word -> stem, e.g. "apple" -> "appl"
+        self.vocab = {
+            "word_to_wid": self.word_to_wid,
+            "word_to_stem": self.word_to_stem,
+            "stem_to_sid": self.stem_to_sid,
+            "word_to_sid": self.word_to_sid,
+        }
+
+    def streaming_tokenize(self, texts: List[str], update_vocab: bool = True):
+        stopwords_set = set(self.stopwords) if self.stopwords is not None else None
+
+        # manually increment tqdm
+        for text in texts:
+            if self.lower:
+                text = text.lower()
+            splitted_words = self.splitter(text)
+
+            doc_ids = []
+            for word in splitted_words:
+                if stopwords_set is not None and word in stopwords_set:
+                    continue
+
+                if word not in self.word_to_wid:
+                    # when we are not updating the vocab, we just skip this word
+                    if not update_vocab:
+                        continue
+
+                    # else if we are updating the vocab, we need to add it to word_to_wid
+                    self.word_to_wid[word] = len(self.word_to_wid)
+
+                    if self.stemmer is not None:
+                        if word not in self.word_to_stem:
+                            stem = self.stemmer(word)
+                            self.word_to_stem[word] = stem
+
+                        stem = self.word_to_stem[word]
+
+                        if stem not in self.stem_to_sid:
+                            self.stem_to_sid[stem] = len(self.stem_to_sid)
+
+                        sid = self.stem_to_sid[stem]
+                        self.word_to_sid[word] = sid
+
+                doc_id = self.word_to_wid[word]
+                doc_ids.append(doc_id)
+
+            yield doc_ids
+
+    def tokenize(
+        self,
+        texts: List[str],
+        update_vocab: bool = True,
+        stream=False,
+        leave_progress: bool = False,
+        show_progress: bool = True,
+        length: int = None,
+    ) -> List[List[int]]:
+        """
+        Tokenize a list of strings and return the token IDs.
+
+        Parameters
+        ----------
+        texts : List[str]
+            A list of strings to tokenize.
+        
+        update_vocab : bool, optional
+            Whether to update the vocabulary dictionary with the new tokens.
+        
+        stream : bool, optional
+            Whether to return a generator that streams the token IDs. If 
+            True, the function will return a generator that streams the token IDs.
+            If False, the function will return a list of token IDs.
+        
+        leave_progress : bool, optional
+            Whether to leave the progress bar after completion. If False, the progress bar
+            will disappear after completion. If True, the progress bar will stay on the screen.
+        
+        show_progress : bool, optional
+            Whether to show the progress bar for tokenization. If False, the function will
+            not show the progress bar. If True, it will use tqdm.auto to show the progress bar.
+        
+        length : int, optional
+            The length of the texts. If None, the function will use the length of the texts.
+            This is mainly used when `texts` is a generator or a stream instead of a list.
+        
+        Returns
+        -------
+        List[List[int]] or Generator[List[int]]
+            If `stream` is True, the function will return a generator that streams the token IDs.
+            If `stream` is False, the function will return a list of token IDs
+        """
+        stream_fn = self.streaming_tokenize(texts=texts, update_vocab=update_vocab)
+        if stream:
+            return stream_fn
+
+        if length is None:
+            length = len(texts)
+        
+        tqdm_kwargs = dict(
+            desc="Tokenize texts",
+            leave=leave_progress,
+            disable=not show_progress,
+            total=length,
+        )
+
+        token_ids = []
+        for doc_ids in tqdm(stream_fn, **tqdm_kwargs):
+            token_ids.append(doc_ids)
+
+        return token_ids
+
+
 def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
     """
     Convert the token IDs back to strings using the vocab dictionary.
@@ -49,7 +191,7 @@ def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
 
 def _infer_stopwords(stopwords: Union[str, List[str]]) -> List[str]:
     # Source of stopwords: https://github.com/nltk/nltk/blob/96ee715997e1c8d9148b6d8e1b32f412f31c7ff7/nltk/corpus/__init__.py#L315
-    if stopwords in ["english", "en", True]: # True is added to support the default
+    if stopwords in ["english", "en", True]:  # True is added to support the default
         return STOPWORDS_EN
     elif stopwords in ["english_plus", "en_plus"]:
         return STOPWORDS_EN_PLUS
@@ -114,22 +256,22 @@ def tokenize(
     texts : Union[str, List[str]]
         A list of strings to tokenize. If a single string is provided, it will be
         converted to a list with a single element.
-    
+
     lower : bool, optional
         Whether to convert the text to lowercase before tokenization
-    
+
     token_pattern : str, optional
         The regex pattern to use for tokenization, by default r"(?u)\b\w\w+\b"
-    
+
     stopwords : Union[str, List[str]], optional
         The list of stopwords to remove from the text. If "english" or "en" is provided,
         the function will use the default English stopwords
-    
+
     stemmer : Callable, optional
         The stemmer to use for stemming the tokens. It is recommended
         to use the PyStemmer library for stemming, but you can also any callable that
         takes a list of strings and returns a list of strings.
-    
+
     return_ids : bool, optional
         Whether to return the tokenized IDs and the vocab dictionary. If False, the
         function will return the tokenized strings. If True, the function will return
@@ -138,7 +280,7 @@ def tokenize(
     show_progress : bool, optional
         Whether to show the progress bar for tokenization. If False, the function will
         not show the progress bar. If True, it will use tqdm.auto to show the progress bar.
-    
+
     leave : bool, optional
         Whether to leave the progress bar after completion. If False, the progress bar
         will disappear after completion. If True, the progress bar will stay on the screen.
@@ -207,7 +349,9 @@ def tokenize(
         }
 
         # Now, we simply need to replace the tokens in the corpus with the stemmed tokens
-        for i, doc_ids in enumerate(tqdm(corpus_ids, desc="Stem Tokens", leave=leave, disable=not show_progress)):
+        for i, doc_ids in enumerate(
+            tqdm(corpus_ids, desc="Stem Tokens", leave=leave, disable=not show_progress)
+        ):
             corpus_ids[i] = [doc_id_to_stem_id[doc_id] for doc_id in doc_ids]
     else:
         vocab_dict = token_to_index
@@ -221,7 +365,12 @@ def tokenize(
         reverse_dict = stem_id_to_stem if stemmer is not None else unique_tokens
         # We convert the token IDs back to tokens in-place
         for i, token_ids in enumerate(
-            tqdm(corpus_ids, desc="Reconstructing token strings", leave=leave, disable=not show_progress)
+            tqdm(
+                corpus_ids,
+                desc="Reconstructing token strings",
+                leave=leave,
+                disable=not show_progress,
+            )
         ):
             corpus_ids[i] = [reverse_dict[token_id] for token_id in token_ids]
 
@@ -242,7 +391,7 @@ def _tokenize_with_vocab_exp(
 
     if vocab_dict is None:
         raise ValueError("vocab_dict must be provided.")
-    
+
     token_pattern = re.compile(token_pattern)
     stopwords = _infer_stopwords(stopwords)
 
@@ -266,7 +415,7 @@ def _tokenize_with_vocab_exp(
                 continue
 
             doc_ids.append(vocab_dict[token])
-        
+
         corpus_ids.append(doc_ids)
 
     # Step 3: Return the tokenized IDs and the vocab dictionary or the tokenized strings
