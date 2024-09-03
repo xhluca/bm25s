@@ -7,6 +7,9 @@ import unittest.mock
 import Stemmer  # optional: for stemming
 import json
 
+import bm25s
+from bm25s.utils import json_functions
+
 class TestUtilsCorpus(unittest.TestCase):
     def setUp(self):
         # let's test the functions
@@ -26,30 +29,15 @@ class TestUtilsCorpus(unittest.TestCase):
                 f.write(s)
 
     # hide orjson from importable
-    def test_load_and_save_mmindex_with_orjson(self):
+    def test_load_and_save_mmindex(self):
         import bm25s
 
-        file = self.file
-
-        mmindex = bm25s.utils.corpus.find_newline_positions(file)
-        bm25s.utils.corpus.save_mmindex(mmindex, file)
-
-        # read the first line
-        mmindex = bm25s.utils.corpus.load_mmindex(file)
-        
-        for i in range(500):
-            self.assertEqual(bm25s.utils.corpus.get_line(file, i, mmindex), self.strings[i])
-
-    @unittest.mock.patch.dict("sys.modules", {"orjson": None})
-    def test_load_and_save_mmindex_without_orjson(self):
-        # assert fail that orjson is not installed
-        with self.assertRaises(Exception):
+        try:
             import orjson
-        
-        import bm25s
+        except ImportError:
+            self.fail("orjson is not installed")
 
         file = self.file
-
         mmindex = bm25s.utils.corpus.find_newline_positions(file)
         bm25s.utils.corpus.save_mmindex(mmindex, file)
 
@@ -58,6 +46,13 @@ class TestUtilsCorpus(unittest.TestCase):
         
         for i in range(500):
             self.assertEqual(bm25s.utils.corpus.get_line(file, i, mmindex), self.strings[i])
+    
+    @unittest.mock.patch("bm25s.utils.json_functions.dumps", json_functions.dumps_with_builtin)
+    @unittest.mock.patch("bm25s.utils.json_functions.loads", json.loads)
+    def test_load_and_save_mmindex_no_orjson(self):
+        self.assertEqual(json_functions.dumps_with_builtin, json_functions.dumps)
+        self.assertEqual(json_functions.loads, json.loads)
+        self.test_load_and_save_mmindex()
     
     def tearDown(self):
         # remove the temp dir with rmtree
