@@ -3,12 +3,17 @@ import shutil
 from pathlib import Path
 import unittest
 import tempfile
-import bm25s
 import Stemmer  # optional: for stemming
+import unittest.mock
 
 class TestBM25SLoadingSaving(unittest.TestCase):
+    orjson_should_not_be_installed = False
+    orjson_should_be_installed = True
+
     @classmethod
     def setUpClass(cls):
+        # check that import orjson fails
+        import bm25s
 
         # Create your corpus here
         corpus = [
@@ -35,6 +40,13 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         cls.stemmer = stemmer
         cls.tmpdirname = tempfile.mkdtemp()
     
+    def setUp(self):
+        # verify that orjson is properly installed
+        try:
+            import orjson
+        except ImportError:
+            self.fail("orjson should be installed to run this test.")
+        
     def test_a_save(self):
         # save the retriever to temp dir
         self.retriever.save(
@@ -63,6 +75,8 @@ class TestBM25SLoadingSaving(unittest.TestCase):
             self.assertTrue(path_exists, error_msg)
 
     def test_b_load(self):
+        import bm25s
+
         # load the retriever from temp dir
         r1 = self.retriever
         r2 = bm25s.BM25.load(
