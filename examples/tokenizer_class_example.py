@@ -32,3 +32,4 @@ for token in tokenizer.streaming_tokenize(texts):
 print(tokenizer.tokenize(texts, show_progress=True, leave_progress=True))
 
 # todo: test with and without stemming, without and without stopwords, with and without lowercasing
+# todo: test inputs to retriever.retrieve() with both list of strings and list of lists of strings and ids and list of of list of ids
