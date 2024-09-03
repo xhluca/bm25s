@@ -129,8 +129,10 @@ class JsonlCorpus:
     Which only loads the line you need into memory, and is much faster.
     """
 
-    def __init__(self, path, show_progress=True, leave_progress=True, save_index=True):
+    def __init__(self, path, show_progress=True, leave_progress=True, save_index=True, verbosity=1):
         self.path = path
+        self.verbosity = verbosity
+
         # if the index file does not exist, create it
         if os.path.exists(change_extension(path, ".mmindex.json")):
             self.mmindex = load_mmindex(path)
@@ -144,9 +146,8 @@ class JsonlCorpus:
 
             self.mmindex = mmindex
 
-        self.file_obj = open(path, "r")
-        self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
-        logging.info("Opened file and mmap objects")
+        # Finally, open the file and mmap objects
+        self.load()
 
     def __len__(self):
         return len(self.mmindex)
@@ -179,12 +180,36 @@ class JsonlCorpus:
         
         raise TypeError("Invalid index type")
 
-    def __del__(self):
+    def close(self):
+        """
+        Close the file and mmap objects. This is useful if you want to free up memory. To reopen them, use the `load` method.
+        If you don't call this method, the objects will be closed automatically when the object is deleted.
+        """
         if hasattr(self, "file_obj"):
             self.file_obj.close()
         if hasattr(self, "mmap_obj"):
             self.mmap_obj.close()
-        logging.info("Closed file and mmap objects")
+        if self.verbosity >= 1:
+            logging.info("Closed file and mmap objects")
+    
+    def load(self):
+        """
+        Load the file and mmap objects. This is useful if you closed them and want to reopen them.
+
+        Note
+        ----
+        This is called automatically when the object is created. You don't need to call it manually.
+        Also, if there is an existing file and mmap object, this will close them before reopening.
+        """
+        self.close()  # close any existing file and mmap objects
+
+        self.file_obj = open(self.path, "r")
+        self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
+        if self.verbosity >= 1:
+            logging.info("Opened file and mmap objects")
+    
+    def __del__(self):
+        self.close()
 
 
 if __name__ == "__main__":
