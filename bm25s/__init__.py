@@ -19,6 +19,11 @@ try:
 except ImportError:
     selection_jit = None
 
+try:
+    from .numba.retrieve_utils import _retrieve_numba_functional
+except ImportError:
+    _retrieve_numba_functional = None
+
 def _faketqdm(iterable, *args, **kwargs):
     return iterable
 
@@ -102,6 +107,7 @@ class BM25:
         dtype="float32",
         int_dtype="int32",
         corpus=None,
+        backend="numpy",
     ):
         """
         BM25S initialization.
@@ -134,6 +140,13 @@ class BM25:
             The corpus of documents. This is optional and is used for saving the corpus
             to the snapshot. We expect the corpus to be a list of dictionaries, where each
             dictionary represents a document.
+        
+        backend : str
+            The backend used during retrieval. By default, it uses the numpy backend, which
+            only requires numpy and scipy as dependencies. You can also select `backend="numba"`
+            to use the numba backend, which requires the numba library. If you select `backend="auto"`,
+            the function will use the numba backend if it is available, otherwise it will use the numpy
+            backend.
         """
         self.k1 = k1
         self.b = b
@@ -145,6 +158,11 @@ class BM25:
         self.methods_requiring_nonoccurrence = ("bm25l", "bm25+")
         self.corpus = corpus
         self._original_version = __version__
+
+        if backend == "auto":
+            self.backend = "numba" if selection_jit is not None else "numpy"
+        else:
+            self.backend = backend
 
     @staticmethod
     def _infer_corpus_object(corpus):
@@ -476,6 +494,7 @@ class BM25:
 
         return topk_scores, topk_indices
 
+
     def retrieve(
         self,
         query_tokens: Union[List[List[str]], tokenization.Tokenized],
@@ -547,7 +566,7 @@ class BM25:
 
         if n_threads == -1:
             n_threads = os.cpu_count()
-    
+
 
         if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
             if len(query_tokens) != 2:
@@ -572,6 +591,37 @@ class BM25:
 
         if isinstance(query_tokens, tokenization.Tokenized):
             query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
+        
+        corpus = corpus if corpus is not None else self.corpus
+        
+        if self.backend == "numba":
+            if _retrieve_numba_functional is None:
+                raise ImportError("Numba is not installed. Please install numba wiith `pip install numba` to use the numba backend.")
+            
+            backend_selection = "numba" if backend_selection == "auto" else backend_selection
+            query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
+            res = _retrieve_numba_functional(
+                query_tokens_ids=query_tokens_ids,
+                scores=self.scores,
+                corpus=corpus,
+                k=k,
+                sorted=sorted,
+                return_as=return_as,
+                show_progress=show_progress,
+                leave_progress=leave_progress,
+                n_threads=n_threads,
+                chunksize=None, # chunksize is ignored in the numba backend
+                backend_selection=backend_selection, # backend_selection is ignored in the numba backend
+                dtype=self.dtype,
+                int_dtype=self.int_dtype,
+                nonoccurrence_array=self.nonoccurrence_array
+            )
+
+            if return_as == "tuple":
+                return Results(documents=res[0], scores=res[1])
+            else:
+                return res
+
 
         tqdm_kwargs = {
             "total": len(query_tokens),
@@ -606,6 +656,8 @@ class BM25:
         else:
             # if it is a JsonlCorpus object, we do not need to convert it to a list
             if isinstance(corpus, utils.corpus.JsonlCorpus):
+                retrieved_docs = corpus[indices]
+            elif isinstance(corpus, np.ndarray) and corpus.ndim == 1:
                 retrieved_docs = corpus[indices]
             else:
                 index_flat = indices.flatten().tolist()
@@ -705,6 +757,7 @@ class BM25:
             int_dtype=self.int_dtype,
             num_docs=self.scores["num_docs"],
             version=__version__,
+            backend=self.backend,
         )
         with open(params_path, "w") as f:
             json.dump(params, f, indent=4)

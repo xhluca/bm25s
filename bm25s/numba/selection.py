@@ -84,12 +84,12 @@ def heap_pop(values, indices, length):
 
 
 @njit()
-def _numba_sorted_top_k(array: np.ndarray, k: int):
+def _numba_sorted_top_k(array: np.ndarray, k: int, sorted=True):
     n = len(array)
     if k > n:
         k = n
 
-    values = np.zeros(k, dtype=array.dtype)
+    values = np.zeros(k, dtype=array.dtype)  # aka scores
     indices = np.zeros(k, dtype=np.int32)
     length = 0
 
@@ -103,16 +103,23 @@ def _numba_sorted_top_k(array: np.ndarray, k: int):
                 indices[0] = i
                 sift_up(values, indices, 0, length)
 
-    # # This is the original code for sorting, we can skip it and return the values and indices
-    # # to let numpy handle the sorting
-    # top_k_values = np.zeros(k, dtype=array.dtype)
-    # top_k_indices = np.zeros(k, dtype=np.int32)
+    if sorted:
+        # # This is the original code for sorting, we can skip it and return the values and indices
+        # # to let numpy handle the sorting
+        # top_k_values = np.zeros(k, dtype=array.dtype)
+        # top_k_indices = np.zeros(k, dtype=np.int32)
 
-    # for i in range(k - 1, -1, -1):
-    #     top_k_values[i], top_k_indices[i] = heap_pop(values, indices, length)
-    #     length -= 1
+        # for i in range(k - 1, -1, -1):
+        #     top_k_values[i], top_k_indices[i] = heap_pop(values, indices, length)
+        #     length -= 1
+        # values = top_k_values
+        # indices = top_k_indices
 
-    # return top_k_values, top_k_indices
+        # This is the new code that uses numpy to sort the values and indices instead of 
+        # using the heap to sort them.
+        sorted_indices = np.flip(np.argsort(values))
+        indices = indices[sorted_indices]
+        values = values[sorted_indices]
 
     return values, indices
 
