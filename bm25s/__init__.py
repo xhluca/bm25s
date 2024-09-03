@@ -746,8 +746,8 @@ class BM25:
         # Save the vocab dictionary
         vocab_path = save_dir / vocab_name
 
-        with open(vocab_path, "w") as f:
-            json_fast.dump(self.vocab_dict, f)
+        with open(vocab_path, "wb") as f:
+            f.write(json_fast.dumps(self.vocab_dict))
 
         # Save the parameters
         params_path = save_dir / params_name

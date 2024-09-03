@@ -38,13 +38,7 @@ def postprocess_results_for_eval(results, scores, query_ids):
 
 
 def merge_cqa_dupstack(data_path):
-    try:
-        import orjson as json
-    except ImportError:
-        try:
-            import ujson as json
-        except ImportError:
-            import json
+    import json
 
     data_path = Path(data_path)
     dataset = data_path.name
