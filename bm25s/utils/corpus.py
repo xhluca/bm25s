@@ -6,9 +6,7 @@ import numpy as np
 
 try:
     import orjson as json
-    ORJSON_LOADED = True
 except ImportError:
-    ORJSON_LOADED = False
     try:
         import ujson as json
     except ImportError:
