@@ -435,7 +435,7 @@ class BM25:
             self.vocab_dict[token] for token in query_tokens if token in self.vocab_dict
         ]
     
-    def get_scores_from_ids(self, query_tokens_ids: List[int]) -> np.ndarray:
+    def get_scores_from_ids(self, query_tokens_ids: List[int], weight_mask=None) -> np.ndarray:
         data = self.scores["data"]
         indices = self.scores["indices"]
         indptr = self.scores["indptr"]
@@ -454,6 +454,10 @@ class BM25:
             dtype=dtype,
         )
 
+        if weight_mask is not None:
+            # multiply the scores by the weight mask
+            scores *= weight_mask
+
         # if there's a non-occurrence array, we need to add the non-occurrence score
         # back to the scores
         if self.nonoccurrence_array is not None:
@@ -462,9 +466,9 @@ class BM25:
 
         return scores
 
-    def get_scores(self, query_tokens_single: List[str]) -> np.ndarray:
+    def get_scores(self, query_tokens_single: List[str], weight_mask=None) -> np.ndarray:
         query_tokens_ids = self.get_tokens_ids(query_tokens_single)
-        return self.get_scores_from_ids(query_tokens_ids)
+        return self.get_scores_from_ids(query_tokens_ids, weight_mask=weight_mask)
 
     def _get_top_k_results(
         self,
@@ -472,13 +476,14 @@ class BM25:
         k: int = 1000,
         backend="auto",
         sorted: bool = False,
+        weight_mask: np.ndarray = None,
     ):
         """
         This function is used to retrieve the top-k results for a single query.
         Since it's a hidden function, the user should not call it directly and
         may change in the future. Please use the `retrieve` function instead.
         """
-        scores_q = self.get_scores(query_tokens_single)
+        scores_q = self.get_scores(query_tokens_single, weight_mask=weight_mask)
         if backend.startswith('numba'):
             if selection_jit is None:
                 raise ImportError("Numba is not installed. Please install numba to use the numba backend.")
@@ -505,6 +510,7 @@ class BM25:
         n_threads: int = 0,
         chunksize: int = 50,
         backend_selection: str = "auto",
+        weight_mask: np.ndarray = None,
     ):
         """
         Retrieve the top-k documents for each query (tokenized).
@@ -554,6 +560,10 @@ class BM25:
         backend_selection : str
             The backend to use for the top-k retrieval. Choose from "auto", "numpy", "jax".
             If "auto", it will use JAX if it is available, otherwise it will use numpy.
+        
+        weight_mask : np.ndarray
+            A weight mask to filter the documents. If provided, the scores for the masked
+            documents will be set to 0 to avoid returning them in the results.
         """
         allowed_return_as = ["tuple", "documents"]
 
@@ -591,6 +601,20 @@ class BM25:
             query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
         
         corpus = corpus if corpus is not None else self.corpus
+
+        if weight_mask is not None:
+            if not isinstance(weight_mask, np.ndarray):
+                raise ValueError("weight_mask must be a numpy array.")
+            
+            # check if weight_mask is a 1D array, if not raise an error
+            if weight_mask.ndim != 1:
+                raise ValueError("weight_mask must be a 1D array.")
+            
+            # check if the length of the weight_mask is the same as the length of the corpus
+            if len(weight_mask) !=  self.scores["num_docs"]:
+                raise ValueError(
+                    "The length of the weight_mask must be the same as the length of the corpus."
+                )
         
         if self.backend == "numba":
             if _retrieve_numba_functional is None:
@@ -628,7 +652,7 @@ class BM25:
             "disable": not show_progress,
         }
         topk_fn = partial(
-            self._get_top_k_results, k=k, sorted=sorted, backend=backend_selection
+            self._get_top_k_results, k=k, sorted=sorted, backend=backend_selection, weight_mask=weight_mask
         )
 
         if n_threads == 0:

@@ -67,6 +67,44 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         results = self.retriever.retrieve(queries_as_tuple, k=1).documents
         self.assertTrue(np.array_equal(ground_truth, results), f"Expected {ground_truth}, got {results}")
 
+
+    def test_retrieve_with_weight_mask(self):
+        
+
+        # first, try with default mode
+        query = "cat feline dog bird fish"  # weights should be [2, 1, 1, 1], but after masking should be [2, 0, 0, 1]
+
+        for dt in [np.float32, np.int32, np.bool_]:
+            weight_mask = np.array([1, 0, 0, 1], dtype=dt)
+            ground_truth = np.array([[0, 3]])
+
+            query_tokens_obj = bm25s.tokenize([query], stopwords="en", stemmer=self.stemmer, return_ids=True)
+
+            # retrieve the top 2 documents
+            results = self.retriever.retrieve(query_tokens_obj, k=2, weight_mask=weight_mask).documents
+            
+            # assert that the retrieved indices are correct
+            self.assertTrue(np.array_equal(ground_truth, results), f"Expected {ground_truth}, got {results}")
+
+            # now, try tokenizing with text tokens
+            query_tokens_texts = bm25s.tokenize([query], stopwords="en", stemmer=self.stemmer, return_ids=False)
+            results = self.retriever.retrieve(query_tokens_texts, k=2, weight_mask=weight_mask).documents
+            self.assertTrue(np.array_equal(ground_truth, results), f"Expected {ground_truth}, got {results}")
+
+            # now, try to pass a tuple of tokens
+            ids, vocab = query_tokens_obj
+            query_tokens_tuple = (ids, vocab)
+            results = self.retriever.retrieve(query_tokens_tuple, k=2, weight_mask=weight_mask).documents
+            self.assertTrue(np.array_equal(ground_truth, results), f"Expected {ground_truth}, got {results}")
+
+            # finally, try to pass a 2-tuple of tokens with text tokens to "try to trick the system"
+            queries_as_tuple = (query_tokens_texts[0], query_tokens_texts[0])
+            # only retrieve 1 document
+            ground_truth = np.array([[0], [0]])
+            results = self.retriever.retrieve(queries_as_tuple, k=1, weight_mask=weight_mask).documents
+            self.assertTrue(np.array_equal(ground_truth, results), f"Expected {ground_truth}, got {results}")
+
+
     def test_failure_of_bad_tuple(self):
         # try to pass a tuple of tokens with different lengths
         query = "a cat is a feline, it's sometimes beautiful but cannot fly"
