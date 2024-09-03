@@ -23,6 +23,7 @@ def _retrieve_internal_jitted_parallel(
     indices: np.ndarray,
     num_docs: int,
     nonoccurrence_array: np.ndarray = None,
+    weight_mask: np.ndarray = None,
 ):
     N = len(query_pointers) - 1
 
@@ -48,6 +49,9 @@ def _retrieve_internal_jitted_parallel(
             nonoccurrence_scores = nonoccurrence_array[query_tokens_single].sum()
             scores_single += nonoccurrence_scores
 
+        if weight_mask is not None:
+            scores_single = scores_single * weight_mask
+        
         topk_scores_sing, topk_indices_sing = _numba_sorted_top_k(
             scores_single, k=k, sorted=sorted
         )
@@ -72,6 +76,7 @@ def _retrieve_numba_functional(
     backend_selection="numba",
     dtype="float32",
     int_dtype="int32",
+    weight_mask=None,
 ):  
     from numba import get_num_threads, set_num_threads, njit
 
@@ -121,6 +126,7 @@ def _retrieve_numba_functional(
         indices=scores["indices"],
         num_docs=scores["num_docs"],
         nonoccurrence_array=nonoccurrence_array,
+        weight_mask=weight_mask,
     )
 
     # reset the number of threads

@@ -138,6 +138,32 @@ class TestNumbaBackendRetrieve(unittest.TestCase):
         self.assertTrue(np.all(retrieved.documents == retrieved_np.documents), "The retrieved documents should be the same")
         self.assertTrue(np.all(retrieved_docs == retrieved_docs_np), "The results should be the same")
 
+    # test weight_mask in retrieve()
+    def test_d_retrieve_with_weight_mask(self):
+        for dt in [np.float32, np.int32, np.bool_]:
+            weight_mask = np.array([1, 1, 0, 1], dtype=dt)
+            # load the retriever from temp dir
+            retriever = bm25s.BM25.load(
+                self.tmpdirname,
+                data_name="data.index.csc.npy",
+                indices_name="indices.index.csc.npy",
+                indptr_name="indptr.index.csc.npy",
+                vocab_name="vocab.json",
+                nnoc_name="nonoccurrence_array.npy",
+                params_name="params.json",
+                load_corpus=True,
+            )
+
+            self.assertTrue(retriever.backend == "numba", "The backend should be 'numba'")
+
+            # now, let's retrieve the top-k results for a query
+            query = ["my cat loves to purr", "a fish likes swimming"]
+
+            query_tokens = bm25s.tokenize(query, stopwords="en", stemmer=self.stemmer)
+
+            # retrieve the top-k results
+            top_k = 2
+            retrieved = retriever.retrieve(query_tokens, k=top_k, return_as="tuple", weight_mask=weight_mask)
 
     @classmethod
     def tearDownClass(cls):
