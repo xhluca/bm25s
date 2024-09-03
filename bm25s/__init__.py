@@ -13,10 +13,7 @@ import numpy as np
 try:
     import orjson as json_fast
 except ImportError:
-    try:
-        import ujson as json_fast
-    except ImportError:
-        import json as json_fast
+    import json as json_fast
 
 try:
     from .numba import selection as selection_jit

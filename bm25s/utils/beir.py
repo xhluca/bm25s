@@ -59,7 +59,6 @@ def merge_cqa_dupstack(data_path):
                     for line in tqdm(
                         f2, desc=f"Merging {corpus_name} Corpus", leave=False
                     ):
-                        # first, read with ujson
                         line = json.loads(line)
                         # add the corpus name to _id
                         line["_id"] = f"{corpus_name}_{line['_id']}"
@@ -80,7 +79,6 @@ def merge_cqa_dupstack(data_path):
                     for line in tqdm(
                         f2, desc=f"Merging {corpus_name} Queries", leave=False
                     ):
-                        # first, read with ujson
                         line = json.loads(line)
                         # add the corpus name to _id
                         line["_id"] = f"{corpus_name}_{line['_id']}"
