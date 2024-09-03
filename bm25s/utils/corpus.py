@@ -5,9 +5,12 @@ import os
 import numpy as np
 
 try:
-    import ujson as json
+    import orjson as json
 except ImportError:
-    import json
+    try:
+        import ujson as json
+    except ImportError:
+        import json
 
 try:
     from tqdm.auto import tqdm

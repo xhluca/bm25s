@@ -39,9 +39,12 @@ def postprocess_results_for_eval(results, scores, query_ids):
 
 def merge_cqa_dupstack(data_path):
     try:
-        import ujson
+        import orjson as json
     except ImportError:
-        import json as ujson
+        try:
+            import ujson as json
+        except ImportError:
+            import json
 
     data_path = Path(data_path)
     dataset = data_path.name
@@ -63,11 +66,11 @@ def merge_cqa_dupstack(data_path):
                         f2, desc=f"Merging {corpus_name} Corpus", leave=False
                     ):
                         # first, read with ujson
-                        line = ujson.loads(line)
+                        line = json.loads(line)
                         # add the corpus name to _id
                         line["_id"] = f"{corpus_name}_{line['_id']}"
                         # write back to file
-                        f.write(ujson.dumps(line))
+                        f.write(json.dumps(line))
                         f.write("\n")
 
     # now, do the same for queries.jsonl
@@ -84,11 +87,11 @@ def merge_cqa_dupstack(data_path):
                         f2, desc=f"Merging {corpus_name} Queries", leave=False
                     ):
                         # first, read with ujson
-                        line = ujson.loads(line)
+                        line = json.loads(line)
                         # add the corpus name to _id
                         line["_id"] = f"{corpus_name}_{line['_id']}"
                         # write back to file
-                        f.write(ujson.dumps(line))
+                        f.write(json.dumps(line))
                         f.write("\n")
 
     # now, do the same for qrels/test.tsv

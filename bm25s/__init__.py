@@ -5,14 +5,18 @@ from functools import partial
 import os
 import logging
 from pathlib import Path
+import json
 from typing import Any, Tuple, Dict, Iterable, List, NamedTuple, Union
 
 import numpy as np
 
 try:
-    import ujson as json
+    import orjson as json_fast
 except ImportError:
-    import json
+    try:
+        import ujson as json_fast
+    except ImportError:
+        import json as json_fast
 
 try:
     from .numba import selection as selection_jit
@@ -743,7 +747,7 @@ class BM25:
         vocab_path = save_dir / vocab_name
 
         with open(vocab_path, "w") as f:
-            json.dump(self.vocab_dict, f)
+            json_fast.dump(self.vocab_dict, f)
 
         # Save the parameters
         params_path = save_dir / params_name
@@ -784,7 +788,7 @@ class BM25:
                         continue
 
                     try:
-                        doc = json.dumps(doc)
+                        doc = json_fast.dumps(doc)
                     except Exception as e:
                         logging.warning(f"Error saving document at index {i}: {e}")
                     else:
@@ -866,7 +870,7 @@ class BM25:
         # Load the vocab dictionary
         vocab_path = save_dir / vocab_name
         with open(vocab_path, "r") as f:
-            vocab_dict = json.load(f)
+            vocab_dict = json_fast.load(f)
 
         # Load the score arrays
         data_path = save_dir / data_name
@@ -903,7 +907,7 @@ class BM25:
                     corpus = []
                     with open(corpus_file, "r") as f:
                         for line in f:
-                            doc = json.loads(line)
+                            doc = json_fast.loads(line)
                             corpus.append(doc)
 
                 bm25_obj.corpus = corpus
