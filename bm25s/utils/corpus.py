@@ -6,7 +6,9 @@ import numpy as np
 
 try:
     import orjson as json
+    ORJSON_LOADED = True
 except ImportError:
+    ORJSON_LOADED = False
     try:
         import ujson as json
     except ImportError:
@@ -19,7 +21,6 @@ except ImportError:
     TQDM_AVAILABLE = False
     def tqdm(iterable=None, *args, **kwargs):
         return iterable
-
 
 def change_extension(path, new_extension):
     path = str(path)
@@ -63,7 +64,7 @@ def save_mmindex(indexes, path):
 def load_mmindex(path):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
-    with open(index_file, "r") as f:
+    with open(index_file, "rb") as f:
         return json.loads(f.read())
 
 
@@ -216,26 +217,3 @@ class JsonlCorpus:
     
     def __del__(self):
         self.close()
-
-
-if __name__ == "__main__":
-    # let's test the functions
-    # random jsonl file
-    file = "file.jsonl"
-    # content is random uuids
-    import uuid
-
-    with open(file, "w") as f:
-        for i in range(500):
-            f.write(json.dumps({"uuid": str(uuid.uuid4())}) + "\n")
-
-    # create the index
-    mmindex = find_newline_positions(file)
-    save_mmindex(mmindex, file)
-
-    # read the first line
-    # load the index
-    mmindex = load_mmindex(file)
-    print(get_line(file, 1, mmindex))
-
-    print(get_line(file, 5, mmindex))
