@@ -3,12 +3,21 @@ import shutil
 from pathlib import Path
 import unittest
 import tempfile
-import bm25s
 import Stemmer  # optional: for stemming
+import unittest.mock
+import json
+
+import bm25s
+from bm25s.utils import json_functions
 
 class TestBM25SLoadingSaving(unittest.TestCase):
+    orjson_should_not_be_installed = False
+    orjson_should_be_installed = True
+
     @classmethod
     def setUpClass(cls):
+        # check that import orjson fails
+        import bm25s
 
         # Create your corpus here
         corpus = [
@@ -35,6 +44,13 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         cls.stemmer = stemmer
         cls.tmpdirname = tempfile.mkdtemp()
     
+    def setUp(self):
+        # verify that orjson is properly installed
+        try:
+            import orjson
+        except ImportError:
+            self.fail("orjson should be installed to run this test.")
+        
     def test_a_save(self):
         # save the retriever to temp dir
         self.retriever.save(
@@ -87,6 +103,21 @@ class TestBM25SLoadingSaving(unittest.TestCase):
 
         # nnoc is stored in self.nnoc
         self.assertTrue((r1.nonoccurrence_array == r2.nonoccurrence_array).all())
+    
+    @unittest.mock.patch("bm25s.utils.json_functions.dumps", json_functions.dumps_with_builtin)
+    @unittest.mock.patch("bm25s.utils.json_functions.loads", json.loads)
+    def test_c_save_no_orjson(self):
+        self.assertEqual(json_functions.dumps_with_builtin, json_functions.dumps)
+        self.assertEqual(json_functions.loads, json.loads)
+        self.test_a_save()
+    
+    @unittest.mock.patch("bm25s.utils.json_functions.dumps", json_functions.dumps_with_builtin)
+    @unittest.mock.patch("bm25s.utils.json_functions.loads", json.loads)
+    def test_d_load_no_orjson(self):
+        self.assertEqual(json_functions.dumps_with_builtin, json_functions.dumps)
+        self.assertEqual(json_functions.loads, json.loads)
+        self.test_b_load()
+
 
     @classmethod
     def tearDownClass(cls):

@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 try:
-    import ujson as json
+    import orjson as json
 except ImportError:
     import json
 
@@ -17,6 +17,7 @@ except ImportError:
     def tqdm(iterable=None, *args, **kwargs):
         return iterable
 
+from . import json_functions
 
 def change_extension(path, new_extension):
     path = str(path)
@@ -54,14 +55,14 @@ def save_mmindex(indexes, path):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
     with open(index_file, "w") as f:
-        f.write(json.dumps(indexes))
+        f.write(json_functions.dumps(indexes))
 
 
 def load_mmindex(path):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
     with open(index_file, "r") as f:
-        return json.loads(f.read())
+        return json_functions.loads(f.read())
 
 
 # now we can jump to any line in the file thanks to the index and mmap
@@ -72,7 +73,7 @@ def get_line(
     encoding="utf-8",
     file_obj=None,
     mmap_obj=None,
-):
+) -> str:
     path = str(path)
     if file_obj is None:
         file_obj = open(path, "r")
@@ -126,8 +127,10 @@ class JsonlCorpus:
     Which only loads the line you need into memory, and is much faster.
     """
 
-    def __init__(self, path, show_progress=True, leave_progress=True, save_index=True):
+    def __init__(self, path, show_progress=True, leave_progress=True, save_index=True, verbosity=1):
         self.path = path
+        self.verbosity = verbosity
+
         # if the index file does not exist, create it
         if os.path.exists(change_extension(path, ".mmindex.json")):
             self.mmindex = load_mmindex(path)
@@ -141,9 +144,8 @@ class JsonlCorpus:
 
             self.mmindex = mmindex
 
-        self.file_obj = open(path, "r")
-        self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
-        logging.info("Opened file and mmap objects")
+        # Finally, open the file and mmap objects
+        self.load()
 
     def __len__(self):
         return len(self.mmindex)
@@ -151,7 +153,7 @@ class JsonlCorpus:
     def __getitem__(self, index):
         # handle multiple indices
         if isinstance(index, int):
-            return json.loads(
+            return json_functions.loads(
                 get_line(
                     self.path,
                     index,
@@ -176,32 +178,39 @@ class JsonlCorpus:
         
         raise TypeError("Invalid index type")
 
-    def __del__(self):
-        if hasattr(self, "file_obj"):
+    def close(self):
+        """
+        Close the file and mmap objects. This is useful if you want to free up memory. To reopen them, use the `load` method.
+        If you don't call this method, the objects will be closed automatically when the object is deleted.
+        """
+        if hasattr(self, "file_obj") and self.file_obj is not None:
             self.file_obj.close()
-        if hasattr(self, "mmap_obj"):
+            # delete the object
+            del self.file_obj
+            self.file_obj = None
+        if hasattr(self, "mmap_obj") and self.mmap_obj is not None:
             self.mmap_obj.close()
-        logging.info("Closed file and mmap objects")
+            # delete the object
+            del self.mmap_obj
+            self.mmap_obj = None
+        if self.verbosity >= 1:
+            logging.info("Closed file and mmap objects")
+    
+    def load(self):
+        """
+        Load the file and mmap objects. This is useful if you closed them and want to reopen them.
 
+        Note
+        ----
+        This is called automatically when the object is created. You don't need to call it manually.
+        Also, if there is an existing file and mmap object, this will close them before reopening.
+        """
+        self.close()  # close any existing file and mmap objects
 
-if __name__ == "__main__":
-    # let's test the functions
-    # random jsonl file
-    file = "file.jsonl"
-    # content is random uuids
-    import uuid
-
-    with open(file, "w") as f:
-        for i in range(500):
-            f.write(json.dumps({"uuid": str(uuid.uuid4())}) + "\n")
-
-    # create the index
-    mmindex = find_newline_positions(file)
-    save_mmindex(mmindex, file)
-
-    # read the first line
-    # load the index
-    mmindex = load_mmindex(file)
-    print(get_line(file, 1, mmindex))
-
-    print(get_line(file, 5, mmindex))
+        self.file_obj = open(self.path, "r")
+        self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
+        if self.verbosity >= 1:
+            logging.info("Opened file and mmap objects")
+    
+    def __del__(self):
+        self.close()
