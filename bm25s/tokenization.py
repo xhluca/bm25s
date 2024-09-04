@@ -67,11 +67,6 @@ class Tokenizer:
         self.word_to_stem = {}  # word -> stemmed word, e.g. "apple" -> "appl"
         self.stem_to_sid = {}  # stem -> stemmed id, e.g. "appl" -> 0
         self.word_to_id = {}  # word -> {stemmed, word} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
-        self.vocab = {
-            "word_to_stem": self.word_to_stem,
-            "stem_to_sid": self.stem_to_sid,
-            "word_to_id": self.word_to_id,
-        }
 
     def streaming_tokenize(self, texts: List[str], update_vocab: bool = True):
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
@@ -88,20 +83,31 @@ class Tokenizer:
             for word in splitted_words:
                 if stopwords_set is not None and word in stopwords_set:
                     continue
+                
+                # We are always updating the word_to_stem mapping since even new
+                # words that we have never seen before can be stemmed, with the
+                # possibility that the stemmed ID is already in the stem_to_sid
+                if self.stemmer is not None and word not in self.word_to_stem:
+                    stem = self.stemmer(word)
+                    self.word_to_stem[word] = stem
 
+                    # if the stem is already in the stem_to_sid, we can just use the ID
+                    # and update the word_to_id dictionary, unless update_vocab is "never"
+                    # in which case we skip this word
+                    if stem in self.stem_to_sid and update_vocab != "never":
+                        sid = self.stem_to_sid[stem]
+                        self.word_to_id[word] = sid
+                    
+                
                 if word not in self.word_to_id:
                     # when we are not updating the vocab, we just skip this word
-                    if not update_vocab:
+                    if update_vocab in [False, "never"]:
                         continue
 
                     # else if we are updating the vocab, we need to add it to _word_to_wid
                     self._word_to_wid[word] = len(self._word_to_wid)
 
                     if self.stemmer is not None:
-                        if word not in self.word_to_stem:
-                            stem = self.stemmer(word)
-                            self.word_to_stem[word] = stem
-
                         stem = self.word_to_stem[word]
 
                         if stem not in self.stem_to_sid:
@@ -118,11 +124,11 @@ class Tokenizer:
     def tokenize(
         self,
         texts: List[str],
-        update_vocab: bool = True,
-        stream=False,
+        update_vocab: Union[bool, str] = "if_empty",
         leave_progress: bool = False,
         show_progress: bool = True,
         length: int = None,
+        return_as: str = "ids",
     ) -> List[List[int]]:
         """
         Tokenize a list of strings and return the token IDs.
@@ -133,12 +139,15 @@ class Tokenizer:
             A list of strings to tokenize.
         
         update_vocab : bool, optional
-            Whether to update the vocabulary dictionary with the new tokens.
-        
-        stream : bool, optional
-            Whether to return a generator that streams the token IDs. If 
-            True, the function will return a generator that streams the token IDs.
-            If False, the function will return a list of token IDs.
+            Whether to update the vocabulary dictionary with the new tokens. If true,
+            the different dictionaries making up the vocabulary will be updated with the
+            new tokens. If False, the vocabulary will not be updated unless you have a stemmer
+            and the stemmed word is in the stem_to_sid dictionary. If update_vocab="if_empty", 
+            the function will only update the vocabulary if it is empty, i.e. when the 
+            function is called for the first time, or if the vocabulary has been reset with 
+            the `reset_vocab` method. If update_vocab="never", the "word_to_id" will never 
+            be updated, even if the stemmed word is in the stem_to_sid dictionary. Only use 
+            this if you are sure that the stemmed words are already in the stem_to_sid dictionary.
         
         leave_progress : bool, optional
             Whether to leave the progress bar after completion. If False, the progress bar
@@ -152,14 +161,36 @@ class Tokenizer:
             The length of the texts. If None, the function will use the length of the texts.
             This is mainly used when `texts` is a generator or a stream instead of a list.
         
+        return_as : str, optional
+            The type of object to return by this function.
+            If "tuple", this returns a Tokenized namedtuple, which contains the token IDs 
+            and the vocab dictionary. 
+            If "string", this return a list of lists of strings, each string being a token. 
+            If "ids", this return a list of lists of integers corresponding to the token IDs,
+            or stemmed IDs if a stemmer is used.
+
         Returns
         -------
-        List[List[int]] or Generator[List[int]]
-            If `stream` is True, the function will return a generator that streams the token IDs.
-            If `stream` is False, the function will return a list of token IDs
+        List[List[int]] or Generator[List[int]] or List[List[str]] or Tokenized object
+            If `return_as="stream"`, a Generator[List[int]] is returned, each integer being a token ID.
+            If `return_as="ids"`, a List[List[int]] is returned, each integer being a token ID.
+            If `return_as="string"`, a List[List[str]] is returned, each string being a token.
+            If `return_as="tuple"`, a Tokenized namedtuple is returned, with names `ids` and `vocab`.
         """
+        incorrect_return_error = "return_as must be either 'tuple', 'string', 'ids', or 'stream'."
+        incorrect_update_vocab_error = "update_vocab must be either True, False, 'if_empty', or 'never'."
+        if return_as not in ["tuple", "string", "ids", "stream"]:
+            raise ValueError(incorrect_return_error)
+        
+        if update_vocab not in [True, False, "if_empty", "never"]:
+            raise ValueError(incorrect_update_vocab_error)
+
+        if update_vocab == "if_empty":
+            update_vocab = len(self._word_to_wid) == 0
+        
         stream_fn = self.streaming_tokenize(texts=texts, update_vocab=update_vocab)
-        if stream:
+
+        if return_as == "stream":
             return stream_fn
 
         if length is None:
@@ -176,8 +207,46 @@ class Tokenizer:
         for doc_ids in tqdm(stream_fn, **tqdm_kwargs):
             token_ids.append(doc_ids)
 
-        return token_ids
+        if return_as == "ids":
+            return token_ids
+        elif return_as == "string":
+            return self.to_lists_of_strings(token_ids)
+        elif return_as == "tuple":
+            return self.to_tokenized_tuple(token_ids)
+        else:
+            raise ValueError(incorrect_return_error)
 
+    
+    def get_vocab_dict(self) -> Dict[str, Any]:
+        if self.stemmer is None:
+            # if we are not using a stemmer, we return the word_to_id dictionary
+            # which maps the words to the word IDs
+            return self._word_to_wid
+        else:
+            # if we are using a stemmer, we return the stem_to_sid dictionary,
+            # which we will use to map the stemmed words to the stemmed IDs
+            return self.stem_to_sid
+
+    def to_tokenized_tuple(self, docs: List[List[int]]) -> Tokenized:
+        """
+        Convert the token IDs to a Tokenized namedtuple, which contains the word IDs, or the stemmed IDs
+        if a stemmer is used. The Tokenized namedtuple contains two fields: ids and vocab. The latter
+        is a dictionary mapping the token IDs to the tokens, or a dictionary mapping the stemmed IDs to 
+        the stemmed tokens (if a stemmer is used).
+        """
+        return Tokenized(ids=docs, vocab=self.get_vocab_dict())
+    
+    def to_lists_of_strings(self, docs: List[List[int]]) -> List[List[str]]:
+        """
+        Convert word IDs (or stemmed IDs if a stemmer is used) back to strings using the vocab dictionary,
+        which is a dictionary mapping the word IDs to the words or a dictionary mapping the stemmed IDs 
+        to the stemmed words (if a stemmer is used).
+        """
+        vocab = self.get_vocab_dict()
+        reverse_vocab = {v: k for k, v in vocab.items()}
+        return [
+            [reverse_vocab[token_id] for token_id in doc] for doc in docs
+        ]
 
 def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
     """
