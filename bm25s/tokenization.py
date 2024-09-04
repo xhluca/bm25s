@@ -69,7 +69,26 @@ class Tokenizer:
         self.word_to_id = {}  # word -> {stemmed, word} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
 
     def streaming_tokenize(self, texts: List[str], update_vocab: bool = True):
+        """
+        Tokenize a list of strings and return a generator of token IDs.
+
+        Parameters
+        ----------
+        texts : List[str]
+            A list of strings to tokenize.
+        
+        update_vocab : bool, optional
+            Whether to update the vocabulary dictionary with the new tokens. If true,
+            the different dictionaries making up the vocabulary will be updated with the
+            new tokens. If False, the function will not update the vocabulary. Unless you have 
+            a stemmer and the stemmed word is in the stem_to_sid dictionary.  If "never",
+            the function will never update the vocabulary, even if the stemmed word is in
+            the stem_to_sid dictionary. Note that update_vocab="if_empty" is not supported 
+            in this method, only in the `tokenize` method.
+        """
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
+        using_stopwords = stopwords_set is not None
+        using_stemmer = self.stemmer is not None
 
         if self.stemmer is None:
             self.word_to_id = self._word_to_wid
@@ -77,13 +96,14 @@ class Tokenizer:
         for text in texts:
             if self.lower:
                 text = text.lower()
+
             splitted_words = self.splitter(text)
 
             doc_ids = []
             for word in splitted_words:
-                if stopwords_set is not None and word in stopwords_set:
+                if using_stopwords and word in stopwords_set:
                     continue
-                
+
                 # We are always updating the word_to_stem mapping since even new
                 # words that we have never seen before can be stemmed, with the
                 # possibility that the stemmed ID is already in the stem_to_sid
@@ -94,7 +114,7 @@ class Tokenizer:
                     # if the stem is already in the stem_to_sid, we can just use the ID
                     # and update the word_to_id dictionary, unless update_vocab is "never"
                     # in which case we skip this word
-                    if stem in self.stem_to_sid and update_vocab != "never":
+                    if update_vocab != "never" and stem in self.stem_to_sid:
                         sid = self.stem_to_sid[stem]
                         self.word_to_id[word] = sid
                     
