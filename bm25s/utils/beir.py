@@ -10,7 +10,7 @@ except ImportError:
 from . import json_functions
 
 BASE_URL = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip"
-
+GH_URL = "https://github.com/xhluca/bm25s/releases/download/data/{}.zip"
 
 def clean_results_keys(beir_results):
     return {k.split("@")[-1]: v for k, v in beir_results.items()}
