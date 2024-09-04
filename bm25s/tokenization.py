@@ -101,15 +101,23 @@ class Tokenizer:
 
             doc_ids = []
             for word in splitted_words:
+                if word in self.word_to_id:
+                    wid = self.word_to_id[word]
+                    doc_ids.append(wid)
+                    continue
+
                 if using_stopwords and word in stopwords_set:
                     continue
 
                 # We are always updating the word_to_stem mapping since even new
                 # words that we have never seen before can be stemmed, with the
                 # possibility that the stemmed ID is already in the stem_to_sid
-                if self.stemmer is not None and word not in self.word_to_stem:
-                    stem = self.stemmer(word)
-                    self.word_to_stem[word] = stem
+                if using_stemmer:
+                    if word in self.word_to_stem:
+                        stem = self.word_to_stem[word]
+                    else:
+                        stem = self.stemmer(word)
+                        self.word_to_stem[word] = stem
 
                     # if the stem is already in the stem_to_sid, we can just use the ID
                     # and update the word_to_id dictionary, unless update_vocab is "never"
@@ -117,27 +125,17 @@ class Tokenizer:
                     if update_vocab != "never" and stem in self.stem_to_sid:
                         sid = self.stem_to_sid[stem]
                         self.word_to_id[word] = sid
-                    
+                        doc_ids.append(sid)
+                        
+                    elif update_vocab is True:
+                        sid = len(self.stem_to_sid)
+                        self.stem_to_sid[stem] = sid
+                        self.word_to_id[word] = sid
+                        doc_ids.append(sid)
                 
                 if word not in self.word_to_id:
-                    # when we are not updating the vocab, we just skip this word
-                    if update_vocab in [False, "never"]:
-                        continue
-
-                    # else if we are updating the vocab, we need to add it to _word_to_wid
-                    self._word_to_wid[word] = len(self._word_to_wid)
-
-                    if self.stemmer is not None:
-                        stem = self.word_to_stem[word]
-
-                        if stem not in self.stem_to_sid:
-                            self.stem_to_sid[stem] = len(self.stem_to_sid)
-
-                        sid = self.stem_to_sid[stem]
-                        self.word_to_id[word] = sid
-
-                wid = self.word_to_id[word]  # if stemmer is None, this is the same as wid
-                doc_ids.append(wid)
+                    if update_vocab is True:
+                        self._word_to_wid[word] = len(self._word_to_wid)
 
             yield doc_ids
 
