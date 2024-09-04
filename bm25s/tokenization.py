@@ -63,10 +63,9 @@ class Tokenizer:
         self.reset_vocab()
 
     def reset_vocab(self):
-        self._word_to_wid = {}  # word -> id, e.g. "apple" -> 2
         self.word_to_stem = {}  # word -> stemmed word, e.g. "apple" -> "appl"
         self.stem_to_sid = {}  # stem -> stemmed id, e.g. "appl" -> 0
-        self.word_to_id = {}  # word -> {stemmed, word} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
+        self.word_to_id = {}  # word -> {stemmed, unstemmed} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
 
     def streaming_tokenize(self, texts: List[str], update_vocab: bool = True):
         """
@@ -89,9 +88,6 @@ class Tokenizer:
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
         using_stopwords = stopwords_set is not None
         using_stemmer = self.stemmer is not None
-
-        if self.stemmer is None:
-            self.word_to_id = self._word_to_wid
         
         for text in texts:
             if self.lower:
@@ -132,10 +128,14 @@ class Tokenizer:
                         self.stem_to_sid[stem] = sid
                         self.word_to_id[word] = sid
                         doc_ids.append(sid)
-                
-                if word not in self.word_to_id:
-                    if update_vocab is True:
-                        self._word_to_wid[word] = len(self._word_to_wid)
+                else:
+                    # if we are not using a stemmer, we can just update the word_to_id
+                    # directly rather than going through the stem_to_sid dictionary
+                    if update_vocab is True and word not in self.word_to_id:
+                        wid = len(self.word_to_id)
+                        self.word_to_id[word] = wid
+                        doc_ids.append(wid)
+
 
             yield doc_ids
 
@@ -204,7 +204,7 @@ class Tokenizer:
             raise ValueError(incorrect_update_vocab_error)
 
         if update_vocab == "if_empty":
-            update_vocab = len(self._word_to_wid) == 0
+            update_vocab = len(self.word_to_id) == 0
         
         stream_fn = self.streaming_tokenize(texts=texts, update_vocab=update_vocab)
 
@@ -239,7 +239,7 @@ class Tokenizer:
         if self.stemmer is None:
             # if we are not using a stemmer, we return the word_to_id dictionary
             # which maps the words to the word IDs
-            return self._word_to_wid
+            return self.word_to_id
         else:
             # if we are using a stemmer, we return the stem_to_sid dictionary,
             # which we will use to map the stemmed words to the stemmed IDs
