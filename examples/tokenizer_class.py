@@ -52,14 +52,23 @@ def main(data_dir="datasets", dataset="scifact"):
         if 1 in q:
             query_ids.append(q)
 
-    # you can convert the ids to a Tokenized namedtuple ids and tokens
+    # you can convert the ids to a Tokenized namedtuple ids and tokens...
     res = tokenizer.to_tokenized_tuple(query_ids)
+    # ... which is equivalent to: 
+    # tokenizer.tokenize(your_query_lst, return_as="tuple", update_vocab=False)
+
+    # You can verify the results
     assert res.ids == query_ids
     assert res.vocab == tokenizer.get_vocab_dict()
     assert isinstance(res, Tokenized)
+
     
     # You can also get strings
     query_strs = tokenizer.to_lists_of_strings(query_ids)
+    # ... which is equivalent to: 
+    # tokenizer.tokenize(your_query_lst, return_as="string", update_vocab=False)
+
+    # let's verify the results
     assert isinstance(query_strs, list)
     assert isinstance(query_strs[0], list)
     assert isinstance(query_strs[0][0], str)
