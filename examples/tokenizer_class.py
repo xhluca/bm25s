@@ -83,6 +83,9 @@ def main(data_dir="datasets", dataset="scifact"):
     vocab_dict = tokenizer.get_vocab_dict()
     results, scores = retriever.retrieve((query_ids, vocab_dict), k=3)
 
+    # Unhappy with your vocab? you can reset your tokenizer
+    tokenizer.reset_vocab()
+
 
 if __name__ == "__main__":
     main()
