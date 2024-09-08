@@ -180,6 +180,48 @@ retriever = bm25s.BM25.load("bm25s_very_big_index", mmap=True)
 
 For an example of how to use retrieve using the `mmap=True` mode, check out [`examples/retrieve_nq.py`](examples/retrieve_nq.py).
 
+
+## Tokenization
+
+In addition to using the simple function `bm25s.tokenize`, you can also use the `Tokenizer` class to customize the tokenization process. This is useful when you want to use a different tokenizer, or when you want to use a different tokenization process for queries and documents:
+
+```python
+from bm25s.tokenization import Tokenizer
+
+corpus = [
+      "a cat is a feline and likes to purr",
+      "a dog is the human's best friend and loves to play",
+      "a bird is a beautiful animal that can fly",
+      "a fish is a creature that lives in water and swims",
+]
+
+# Pick your favorite stemmer, and pass 
+stemmer = None
+stopwords = []
+splitter = lambda x: x.split() # function or regex pattern
+# Create a tokenizer
+tokenizer = Tokenizer(
+      stemmer=stemmer, stopwords=stopwords, splitter=splitter
+)
+
+corpus_tokens = tokenizer.tokenize(corpus)
+
+# let's see what the tokens look like
+print("tokens:", corpus_tokens)
+print("vocab:", tokenizer.get_vocab_dict())
+
+# note: the vocab dict will either be a dict of `word -> id` if you don't have a stemmer, and a dict of `stemmed word -> stem id` if you do.
+```
+
+You can find advanced examples in [examples/tokenizer_class.py](examples/tokenizer_class.py), including how to:
+* Pass a stemmer, stopwords, and splitter function/regex pattern
+* Control whether vocabulary is updated by `tokenizer.tokenize` calls or not (by default, it will only be updated during the first call)
+* Reset the tokenizer to its initial state with `tokenizer.reset_vocab()`
+* Use the tokenizer in generator mode to save memory by `yield`ing one document at a time.
+* Pass different outputs of the tokenizer to the `BM25.retrieve` function.
+
+
+
 ## Variants
 
 You can use the following variants of BM25 in `bm25s` (see [Kamphuis et al. 2020](https://link.springer.com/chapter/10.1007/978-3-030-45442-5_4) for more details):
