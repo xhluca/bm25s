@@ -73,6 +73,27 @@ def get_unique_tokens(
         unique_tokens.update(doc_tokens)
     return unique_tokens
 
+
+def is_list_of_list_of_type(obj, type_=int):
+    if not isinstance(obj, list):
+        return False
+
+    if len(obj) == 0:
+        return False
+
+    first_elem = obj[0]
+    if not isinstance(first_elem, list):
+        return False
+
+    if len(first_elem) == 0:
+        return False
+
+    first_token = first_elem[0]
+    if not isinstance(first_token, type_):
+        return False
+
+    return True
+
 def _is_tuple_of_list_of_tokens(obj):
     if not isinstance(obj, tuple):
         return False
@@ -467,7 +488,17 @@ class BM25:
         return scores
 
     def get_scores(self, query_tokens_single: List[str], weight_mask=None) -> np.ndarray:
-        query_tokens_ids = self.get_tokens_ids(query_tokens_single)
+        if not isinstance(query_tokens_single, list):
+            raise ValueError("The query_tokens must be a list of tokens.")
+        
+        if isinstance(query_tokens_single[0], str):
+            query_tokens_ids = self.get_tokens_ids(query_tokens_single)
+        elif isinstance(query_tokens_single[0], int):
+            # already are token IDs, no need to convert
+            query_tokens_ids = query_tokens_single
+        else:
+            raise ValueError("The query_tokens must be a list of tokens or a list of token IDs.")
+        
         return self.get_scores_from_ids(query_tokens_ids, weight_mask=weight_mask)
 
     def _get_top_k_results(
@@ -575,7 +606,6 @@ class BM25:
         if n_threads == -1:
             n_threads = os.cpu_count()
 
-
         if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
             if len(query_tokens) != 2:
                 msg = (
@@ -621,7 +651,16 @@ class BM25:
                 raise ImportError("Numba is not installed. Please install numba wiith `pip install numba` to use the numba backend.")
             
             backend_selection = "numba" if backend_selection == "auto" else backend_selection
-            query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
+            # if is list of list of int
+            if is_list_of_list_of_type(query_tokens, type_=int):
+                query_tokens_ids = query_tokens
+            elif is_list_of_list_of_type(query_tokens, type_=str):
+                query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
+            else:
+                raise ValueError(
+                    "The query_tokens must be a list of list of tokens (str for stemmed words, int for token ids matching corpus) or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
+                )
+            
             res = _retrieve_numba_functional(
                 query_tokens_ids=query_tokens_ids,
                 scores=self.scores,
