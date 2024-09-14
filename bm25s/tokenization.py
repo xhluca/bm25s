@@ -69,7 +69,7 @@ class Tokenizer:
         lower: bool = True,
         splitter: Union[str, Callable] = r"(?u)\b\w\w+\b",
         stopwords: Union[str, List[str]] = "english",
-        stemmer: Callable = None,
+        stemmer: Callable = None,  # type: ignore
     ):
         self.lower = lower
         if isinstance(splitter, str):
@@ -100,7 +100,7 @@ class Tokenizer:
             {}
         )  # word -> {stemmed, unstemmed} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
 
-    def streaming_tokenize(self, texts: List[str], update_vocab: bool = True):
+    def streaming_tokenize(self, texts: List[str], update_vocab: Union[bool, str] = True):
         """
         Tokenize a list of strings and return a generator of token IDs.
 
@@ -426,12 +426,10 @@ def tokenize(
     if isinstance(texts, str):
         texts = [texts]
 
-    token_pattern = re.compile(token_pattern)
+    split_fn = re.compile(token_pattern).findall
     stopwords = _infer_stopwords(stopwords)
 
     # Step 1: Split the strings using the regex pattern
-    split_fn = token_pattern.findall
-
     corpus_ids = []
     token_to_index = {}
 
