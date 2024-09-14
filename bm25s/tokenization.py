@@ -3,8 +3,6 @@ import re
 from typing import Any, Dict, List, Union, Callable, NamedTuple
 import typing
 
-from torch import Generator
-
 try:
     from tqdm.auto import tqdm
 except ImportError:
