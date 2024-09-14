@@ -65,12 +65,12 @@ class TestTokenizer(unittest.TestCase):
     def test_invalid_splitter(self):
         """Tests the `__init__` method for handling an invalid `splitter` input."""
         with self.assertRaises(ValueError):
-            Tokenizer(splitter=123)
+            Tokenizer(splitter=123) # type: ignore
 
     def test_invalid_stemmer(self):
         """Tests the `__init__` method for handling an invalid `stemmer` input."""
         with self.assertRaises(ValueError):
-            Tokenizer(stemmer="not_callable")
+            Tokenizer(stemmer="not_callable") # type: ignore
 
     def test_tokenize_with_empty_vocab(self):
         """Tests the `tokenize` method with the `update_vocab="if_empty"` parameter."""
@@ -120,14 +120,14 @@ class TestTokenizer(unittest.TestCase):
     def test_to_tokenized_tuple(self):
         """Tests the `to_tokenized_tuple` method to ensure it correctly converts token IDs to a named tuple."""
         docs = self.tokenizer.tokenize(self.corpus, return_as="ids", show_progress=False)
-        tokenized_tuple = self.tokenizer.to_tokenized_tuple(docs)
+        tokenized_tuple = self.tokenizer.to_tokenized_tuple(docs) # type: ignore
         self.assertIsInstance(tokenized_tuple, tuple)
-        self.assertEqual(len(tokenized_tuple.ids), len(docs))
+        self.assertEqual(len(tokenized_tuple.ids), len(docs)) # type: ignore
 
     def test_decode_method(self):
         """Tests the `to_lists_of_strings` method to ensure it converts token IDs back to strings properly."""
         docs = self.tokenizer.tokenize(self.corpus_large[:1000], return_as="ids", show_progress=False)
-        strings = self.tokenizer.decode(docs)
+        strings = self.tokenizer.decode(docs) # type: ignore
         self.assertIsInstance(strings, list)
         for doc in strings:
             self.assertIsInstance(doc, list)
@@ -138,7 +138,7 @@ class TestTokenizer(unittest.TestCase):
     def test_compare_class_with_functional(self):
         """Tests the `to_lists_of_strings` method to ensure it converts token IDs back to strings properly."""
         docs = self.tokenizer.tokenize(self.corpus_large, return_as="ids", show_progress=False)
-        strings = self.tokenizer.decode(docs)
+        strings = self.tokenizer.decode(docs) # type: ignore
 
         # now, do the same using bm25s.tokenize
         strings2 = self.tokenizer.tokenize(self.corpus_large, return_as="string")
