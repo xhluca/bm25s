@@ -9,10 +9,11 @@ with open("README.md", encoding="utf8") as fp:
     long_description = fp.read()
 
 extras_require = {
-    "core": ["jax[cpu]", "orjson", "tqdm", "PyStemmer"],
+    "core": ["orjson", "tqdm", "PyStemmer", "numba"],
     "stem": ["PyStemmer"],
     "hf": ["huggingface_hub"],
     "dev": ["black"],
+    "selection": ["jax[cpu]"],
 }
 # Dynamically create the 'full' extra by combining all other extras
 extras_require["full"] = sum(extras_require.values(), [])
