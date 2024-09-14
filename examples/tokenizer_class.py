@@ -64,7 +64,7 @@ def main(data_dir="datasets", dataset="scifact"):
 
     
     # You can also get strings
-    query_strs = tokenizer.to_lists_of_strings(query_ids)
+    query_strs = tokenizer.decode(query_ids)
     # ... which is equivalent to: 
     # tokenizer.tokenize(your_query_lst, return_as="string", update_vocab=False)
 

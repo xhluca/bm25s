@@ -118,7 +118,7 @@ class TestTokenizer(unittest.TestCase):
     def test_to_lists_of_strings(self):
         """Tests the `to_lists_of_strings` method to ensure it converts token IDs back to strings properly."""
         docs = self.tokenizer.tokenize(self.corpus, return_as="ids")
-        strings = self.tokenizer.to_lists_of_strings(docs)
+        strings = self.tokenizer.decode(docs)
         self.assertIsInstance(strings, list)
         for doc in strings:
             self.assertIsInstance(doc, list)
