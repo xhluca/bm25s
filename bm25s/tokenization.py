@@ -1,5 +1,7 @@
+from ast import Tuple
 import re
 from typing import Any, Dict, List, Union, Callable, NamedTuple
+import typing
 
 try:
     from tqdm.auto import tqdm
@@ -37,12 +39,37 @@ class Tokenized(NamedTuple):
 
 
 class Tokenizer:
+    """
+    Tokenizer class for tokenizing a list of strings and converting them to token IDs.
+
+    Parameters
+    ----------
+    lower : bool, optional
+        Whether to convert the text to lowercase before tokenization
+    
+    splitter : Union[str, Callable], optional
+        If a string is provided, the tokenizer will interpret it as a regex pattern,
+        and use the `re.compile` function to compile the pattern and use the `findall` method
+        to split the text. If a callable is provided, the tokenizer will use the callable to
+        split the text. The callable should take a string as input and return a list of strings.
+    
+    stopwords : Union[str, List[str]], optional
+        The list of stopwords to remove from the text. If "english" or "en" is provided,
+        the function will use the default English stopwords. If None or False is provided,
+        no stopwords will be removed. If a list of strings is provided, the tokenizer will
+        use the list of strings as stopwords.
+    
+    stemmer : Callable, optional
+        The stemmer to use for stemming the tokens. It is recommended
+        to use the PyStemmer library for stemming, but you can also any callable that
+        takes a list of strings and returns a list of strings.
+    """
     def __init__(
         self,
         lower: bool = True,
-        splitter: str = r"(?u)\b\w\w+\b",
+        splitter: Union[str, Callable] = r"(?u)\b\w\w+\b",
         stopwords: Union[str, List[str]] = "english",
-        stemmer: Callable = None,
+        stemmer: Callable = None,  # type: ignore
     ):
         self.lower = lower
         if isinstance(splitter, str):
@@ -63,13 +90,17 @@ class Tokenizer:
         self.reset_vocab()
 
     def reset_vocab(self):
+        """
+        Reset the vocabulary dictionaries to empty dictionaries, allowing you to
+        tokenize a new set of texts without reusing the previous vocabulary.
+        """
         self.word_to_stem = {}  # word -> stemmed word, e.g. "apple" -> "appl"
         self.stem_to_sid = {}  # stem -> stemmed id, e.g. "appl" -> 0
         self.word_to_id = (
             {}
         )  # word -> {stemmed, unstemmed} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
 
-    def streaming_tokenize(self, texts: List[str], update_vocab: bool = True):
+    def streaming_tokenize(self, texts: List[str], update_vocab: Union[bool, str] = True):
         """
         Tokenize a list of strings and return a generator of token IDs.
 
@@ -146,9 +177,9 @@ class Tokenizer:
         update_vocab: Union[bool, str] = "if_empty",
         leave_progress: bool = False,
         show_progress: bool = True,
-        length: int = None,
+        length: Union[int, None] = None,
         return_as: str = "ids",
-    ) -> List[List[int]]:
+    ) -> Union[List[List[int]], List[List[str]], typing.Generator, Tokenized]:
         """
         Tokenize a list of strings and return the token IDs.
 
@@ -177,8 +208,9 @@ class Tokenizer:
             not show the progress bar. If True, it will use tqdm.auto to show the progress bar.
 
         length : int, optional
-            The length of the texts. If None, the function will use the length of the texts.
-            This is mainly used when `texts` is a generator or a stream instead of a list.
+            The length of the texts. If None, the function will call `len(texts)` to get the length.
+            This is mainly used when `texts` is a generator or a stream instead of a list, in which case
+            `len(texts)` will raise a TypeError, and you need to provide the length manually.
 
         return_as : str, optional
             The type of object to return by this function.
@@ -233,7 +265,7 @@ class Tokenizer:
         if return_as == "ids":
             return token_ids
         elif return_as == "string":
-            return self.to_lists_of_strings(token_ids)
+            return self.decode(token_ids)
         elif return_as == "tuple":
             return self.to_tokenized_tuple(token_ids)
         else:
@@ -258,11 +290,21 @@ class Tokenizer:
         """
         return Tokenized(ids=docs, vocab=self.get_vocab_dict())
 
-    def to_lists_of_strings(self, docs: List[List[int]]) -> List[List[str]]:
+    def decode(self, docs: List[List[int]]) -> List[List[str]]:
         """
         Convert word IDs (or stemmed IDs if a stemmer is used) back to strings using the vocab dictionary,
         which is a dictionary mapping the word IDs to the words or a dictionary mapping the stemmed IDs
         to the stemmed words (if a stemmer is used).
+
+        Parameters
+        ----------
+        docs : List[List[int]]
+            A list of lists of word IDs or stemmed IDs.
+        
+        Returns
+        -------
+        List[List[str]]
+            A list of lists of strings, each string being a word or a stemmed word if a stemmer is used.
         """
         vocab = self.get_vocab_dict()
         reverse_vocab = {v: k for k, v in vocab.items()}
@@ -280,7 +322,7 @@ def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
     ]
 
 
-def _infer_stopwords(stopwords: Union[str, List[str]]) -> List[str]:
+def _infer_stopwords(stopwords: Union[str, List[str]]) -> Union[List[str], tuple]:
     # Source of stopwords: https://github.com/nltk/nltk/blob/96ee715997e1c8d9148b6d8e1b32f412f31c7ff7/nltk/corpus/__init__.py#L315
     if stopwords in ["english", "en", True]:  # True is added to support the default
         return STOPWORDS_EN
@@ -322,7 +364,7 @@ def tokenize(
     lower: bool = True,
     token_pattern: str = r"(?u)\b\w\w+\b",
     stopwords: Union[str, List[str]] = "english",
-    stemmer: Callable = None,
+    stemmer: Callable = None, # type: ignore
     return_ids: bool = True,
     show_progress: bool = True,
     leave: bool = False,
@@ -384,12 +426,10 @@ def tokenize(
     if isinstance(texts, str):
         texts = [texts]
 
-    token_pattern = re.compile(token_pattern)
+    split_fn = re.compile(token_pattern).findall
     stopwords = _infer_stopwords(stopwords)
 
     # Step 1: Split the strings using the regex pattern
-    split_fn = token_pattern.findall
-
     corpus_ids = []
     token_to_index = {}
 
