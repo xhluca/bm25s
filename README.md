@@ -406,6 +406,7 @@ When you run `bm25s` on 1000 queries on the Natural Questions dataset (2M+ docum
 
 * The multilingual stopwords are sourced from the [NLTK stopwords lists](https://github.com/nltk/nltk/blob/96ee715997e1c8d9148b6d8e1b32f412f31c7ff7/nltk/corpus/__init__.py#L315).
 * The numba implementation are inspired by numba implementations originally proposed by [baguetter](https://github.com/mixedbread-ai/baguetter) and [retriv](https://github.com/AmenRa/retriv).
+* The function `bm25s.utils.beir.evaluate` is taken from the [BEIR library](https://github.com/beir-cellar/beir). It follows the same license as the BEIR library, which is Apache 2.0.
 
 ## Citation
 
