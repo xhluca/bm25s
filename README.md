@@ -51,7 +51,7 @@ Below, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25
 </details>
 
 > [!IMPORTANT]
-> BM25S just got faster! We are currently testing out integration with numba, which would make it up to [2x faster for larger datasets](https://github.com/xhluca/bm25-benchmarks?tab=readme-ov-file#queries-per-second)! Learn more about it and share your thoughts in [this discussion thread](https://github.com/xhluca/bm25s/discussions/46).
+> New in version 0.2.0: We are rolling out support for a numba backend, which gives around [2x speedup for larger datasets](https://github.com/xhluca/bm25-benchmarks?tab=readme-ov-file#queries-per-second)! Learn more about it and share your thoughts in [the version 0.2.0 release thread](https://github.com/xhluca/bm25s/discussions/58).
 
 ## Installation
 
