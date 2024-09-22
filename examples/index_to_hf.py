@@ -29,7 +29,7 @@ import bm25s.hf
 from bm25s.utils.beir import BASE_URL
 
 
-def main(user, save_dir="datasets", repo_name="bm25s-scifact-index", dataset="scifact"):
+def main(user, save_dir="datasets", repo_name="bm25s-scifact-testing", dataset="scifact"):
     # First, use the beir library to download the dataset, and process it
     data_path = beir.util.download_and_unzip(BASE_URL.format(dataset), save_dir)
     corpus, _, __ = GenericDataLoader(data_folder=data_path).load(split="test")
@@ -48,6 +48,26 @@ def main(user, save_dir="datasets", repo_name="bm25s-scifact-index", dataset="sc
 
     hf_token = os.getenv("HF_TOKEN")
     retriever.save_to_hub(repo_id=f"{user}/{repo_name}", token=hf_token, corpus=corpus_records)
+
+    # you can do the same with a tokenizer class
+    tokenizer = bm25s.hf.TokenizerHF(stemmer=stemmer)
+    tokenizer.tokenize(corpus_lst, update_vocab=True)
+    tokenizer.save_vocab_to_hub(repo_id=f"{user}/{repo_name}", token=hf_token)
+
+    # you can also load the retriever and tokenizer from the hub
+    tokenizer_new = bm25s.hf.TokenizerHF(stemmer=stemmer)
+    tokenizer_new.load_vocab_from_hub(repo_id=f"{user}/{repo_name}", token=hf_token)
+
+    # You can do the same for stopwords
+    stopwords = tokenizer.stopwords
+    tokenizer.save_stopwords_to_hub(repo_id=f"{user}/{repo_name}", token=hf_token)
+
+    # you can also load the stopwords from the hub
+    tokenizer_new.load_stopwords_from_hub(repo_id=f"{user}/{repo_name}", token=hf_token)
+    
+    print("Original stopwords:", stopwords)
+    print("Reloaded stopwords:", tokenizer_new.stopwords)
+
 
 if __name__ == "__main__":
     user = os.getenv("HF_USERNAME", "write-your-username-here")
