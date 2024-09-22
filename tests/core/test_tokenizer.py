@@ -1,3 +1,6 @@
+import os
+import shutil
+import tempfile
 from typing import Generator
 import unittest
 import Stemmer
@@ -25,6 +28,9 @@ class TestTokenizer(unittest.TestCase):
 
         # Initialize a stemmer
         cls.stemmer = Stemmer.Stemmer("english")
+
+        # temp dir
+        cls.tmpdir = tempfile.mkdtemp()
 
     def setUp(self):
         # Initialize the Tokenizer with default settings
@@ -146,10 +152,69 @@ class TestTokenizer(unittest.TestCase):
         # compare the two
         self.assertEqual(strings, strings2)
     
+    def test_save_load_vocab(self):
+        """
+        Tests the save_vocab and load_vocab methods to ensure that the vocabulary is saved and loaded correctly.
+        First, this test will tokenize a corpus and store the tokens for later comparison. Then, the vocabulary
+        will be saved to a file, and the tokenizer will be re-initialized. Finally, the vocabulary will be loaded
+        from the file, and the tokenization will be performed again. The tokens from the first tokenization and the
+        second tokenization should be the same.
+        """
+        corpus = self.corpus_large[:500]
+        # Tokenize the corpus and store the tokens
+        tokenizer = Tokenizer(stemmer=self.stemmer)
+        tokens_original = tokenizer.tokenize(corpus, return_as="ids", update_vocab=True, show_progress=False)
+        vocab = tokenizer.get_vocab_dict()
+        
+        # Save the vocabulary to a temp dir
+        tokenizer.save_vocab(save_dir=self.tmpdir, vocab_name="vocab.tokenizer.json")
+
+        # Re-initialize the tokenizer and load the vocabulary from the file
+        tokenizer2 = Tokenizer(stemmer=self.stemmer)
+        tokenizer2.load_vocab(save_dir=self.tmpdir, vocab_name="vocab.tokenizer.json")
+
+        # Tokenize the corpus again
+        tokens_new = tokenizer2.tokenize(corpus, return_as="ids", show_progress=False)
+        vocab_new = tokenizer2.get_vocab_dict()
+
+        # Compare the tokens from the first and second tokenization
+        self.assertEqual(tokens_original, tokens_new)
+        # Compare the vocabularies from the first and second tokenization
+        self.assertEqual(vocab, vocab_new)
+    
+    def test_save_load_stopwords(self):
+        """
+        Tests the save_stopwords and load_stopwords methods to ensure that the stopwords are saved and loaded correctly.
+        First, this test will tokenize a corpus and store the tokens for later comparison. Then, the stopwords will be
+        saved to a file, and the tokenizer will be re-initialized. Finally, the stopwords will be loaded from the file,
+        and the tokenization will be performed again. The tokens from the first tokenization and the second tokenization
+        should be the same.
+        """
+        corpus = self.corpus_large[:500]
+        # Tokenize the corpus and store the tokens
+        tokenizer = Tokenizer(stemmer=self.stemmer, stopwords="english")
+        tokens_original = tokenizer.tokenize(corpus, return_as="ids", update_vocab=True, show_progress=False)
+        stopwords = tokenizer.stopwords
+        
+        # Save the stopwords to a temp dir
+        tokenizer.save_stopwords(save_dir=self.tmpdir, stopwords_name="stopwords.tokenizer.json")
+
+        # Re-initialize the tokenizer and load the stopwords from the file
+        tokenizer2 = Tokenizer(stemmer=self.stemmer, stopwords=[])
+
+        # check if stopwords are empty
+        self.assertEqual(tokenizer2.stopwords, [])
+
+        tokenizer2.load_stopwords(save_dir=self.tmpdir, stopwords_name="stopwords.tokenizer.json")
+
+        # Check if the stopwords are loaded correctly
+        self.assertEqual(stopwords, tuple(tokenizer2.stopwords))
+
     @classmethod
     def tearDownClass(cls):
         """Cleans up resources after all tests have run (not required in this test case)."""
-        pass
+        # delete temp dir
+        shutil.rmtree(cls.tmpdir)
 
 
 if __name__ == "__main__":

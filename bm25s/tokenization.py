@@ -1,7 +1,10 @@
 from ast import Tuple
+from pathlib import Path
 import re
 from typing import Any, Dict, List, Union, Callable, NamedTuple
 import typing
+
+from bm25s.utils import json_functions
 
 try:
     from tqdm.auto import tqdm
@@ -46,24 +49,25 @@ class Tokenizer:
     ----------
     lower : bool, optional
         Whether to convert the text to lowercase before tokenization
-    
+
     splitter : Union[str, Callable], optional
         If a string is provided, the tokenizer will interpret it as a regex pattern,
         and use the `re.compile` function to compile the pattern and use the `findall` method
         to split the text. If a callable is provided, the tokenizer will use the callable to
         split the text. The callable should take a string as input and return a list of strings.
-    
+
     stopwords : Union[str, List[str]], optional
         The list of stopwords to remove from the text. If "english" or "en" is provided,
         the function will use the default English stopwords. If None or False is provided,
         no stopwords will be removed. If a list of strings is provided, the tokenizer will
         use the list of strings as stopwords.
-    
+
     stemmer : Callable, optional
         The stemmer to use for stemming the tokens. It is recommended
         to use the PyStemmer library for stemming, but you can also any callable that
         takes a list of strings and returns a list of strings.
     """
+
     def __init__(
         self,
         lower: bool = True,
@@ -96,11 +100,101 @@ class Tokenizer:
         """
         self.word_to_stem = {}  # word -> stemmed word, e.g. "apple" -> "appl"
         self.stem_to_sid = {}  # stem -> stemmed id, e.g. "appl" -> 0
-        self.word_to_id = (
-            {}
-        )  # word -> {stemmed, unstemmed} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
+        # word -> {stemmed, unstemmed} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
+        self.word_to_id = {}
 
-    def streaming_tokenize(self, texts: List[str], update_vocab: Union[bool, str] = True):
+    def save_vocab(self, save_dir: str, vocab_name: str = "vocab.tokenizer.json"):
+        """
+        Save the vocabulary dictionaries to a file. The file is saved in JSON format.
+
+        Parameters
+        ----------
+        save_dir : str
+            The directory where the vocabulary file is saved.
+        
+        vocab_name : str, optional
+            The name of the vocabulary file. Default is "vocab.tokenizer.json". Make
+            sure to not use the same name as the vocab.index.json file saved by the BM25
+            model, as it will overwrite the vocab.index.json file and cause errors.
+        """
+        save_dir: Path = Path(save_dir)
+        path = save_dir / vocab_name
+
+        save_dir.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            d = {
+                "word_to_stem": self.word_to_stem,
+                "stem_to_sid": self.stem_to_sid,
+                "word_to_id": self.word_to_id,
+            }
+            f.write(json_functions.dumps(d))
+        
+    def load_vocab(self, save_dir: str, vocab_name: str = "vocab.tokenizer.json"):
+        """
+        Load the vocabulary dictionaries from a file. The file should be saved in JSON format.
+
+        Parameters
+        ----------
+        save_dir : str
+            The directory where the vocabulary file is saved.
+        
+        vocab_name : str, optional
+            The name of the vocabulary file.
+        
+        Note
+        ----
+        The vocabulary file should be saved in JSON format, with the following keys:
+        - word_to_stem: a dictionary mapping words to their stemmed words
+        - stem_to_sid: a dictionary mapping stemmed words to their stemmed IDs
+        - word_to_id: a dictionary mapping words to their word
+        """
+        path = Path(save_dir) / vocab_name
+
+        with open(path, "r") as f:
+            d = json_functions.loads(f.read())
+            self.word_to_stem = d["word_to_stem"]
+            self.stem_to_sid = d["stem_to_sid"]
+            self.word_to_id = d["word_to_id"]
+    
+    def save_stopwords(self, save_dir: str, stopwords_name: str = "stopwords.tokenizer.json"):
+        """
+        Save the stopwords to a file. The file is saved in JSON format.
+
+        Parameters
+        ----------
+        save_dir : str
+            The directory where the stopwords file is saved.
+        
+        stopwords_name : str, optional
+            The name of the stopwords file. Default is "stopwords.tokenizer.json".
+        """
+        save_dir: Path = Path(save_dir)
+        path = save_dir / stopwords_name
+
+        save_dir.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(json_functions.dumps(self.stopwords))
+    
+    def load_stopwords(self, save_dir: str, stopwords_name: str = "stopwords.tokenizer.json"):
+        """
+        Load the stopwords from a file. The file should be saved in JSON format.
+
+        Parameters
+        ----------
+        save_dir : str
+            The directory where the stopwords file is saved.
+        
+        stopwords_name : str, optional
+            The name of the stopwords file.
+        """
+        path = Path(save_dir) / stopwords_name
+
+        with open(path, "r") as f:
+            self.stopwords = json_functions.loads(f.read())
+
+    def streaming_tokenize(
+        self, texts: List[str], update_vocab: Union[bool, str] = True
+    ):
         """
         Tokenize a list of strings and return a generator of token IDs.
 
@@ -300,7 +394,7 @@ class Tokenizer:
         ----------
         docs : List[List[int]]
             A list of lists of word IDs or stemmed IDs.
-        
+
         Returns
         -------
         List[List[str]]
@@ -364,7 +458,7 @@ def tokenize(
     lower: bool = True,
     token_pattern: str = r"(?u)\b\w\w+\b",
     stopwords: Union[str, List[str]] = "english",
-    stemmer: Callable = None, # type: ignore
+    stemmer: Callable = None,  # type: ignore
     return_ids: bool = True,
     show_progress: bool = True,
     leave: bool = False,

@@ -4,6 +4,8 @@
 This script shows how to load an index built with BM25.index and saved with BM25.save, and retrieve
 the top-k results for a set of queries from the SciFact dataset, via the BEIR library.
 """
+import shutil
+import tempfile
 import beir.util
 from beir.datasets.data_loader import GenericDataLoader
 import Stemmer
@@ -92,8 +94,33 @@ def main(data_dir="datasets", dataset="scifact"):
     vocab_dict = tokenizer.get_vocab_dict()
     results, scores = retriever.retrieve((query_ids, vocab_dict), k=3)
 
+    # If you want, you can save the vocab and stopwords, it can be the same dir as your index
+    your_index_dir = tempfile.mkdtemp()
+    tokenizer.save_vocab(save_dir=your_index_dir)
+
     # Unhappy with your vocab? you can reset your tokenizer
     tokenizer.reset_vocab()
+
+
+    # loading:
+    new_tokenizer = Tokenizer(
+        stemmer=stemmer,
+        lower=True,
+        stopwords=[],
+        splitter=r"\w+",
+    )
+    print("Vocabulary size before reloading:", len(new_tokenizer.get_vocab_dict()))
+    new_tokenizer.load_vocab(your_index_dir)
+    print("Vocabulary size after reloading:", len(new_tokenizer.get_vocab_dict()))
+
+    # the same can be done for stopwords
+    print("stopwords before reloading:", new_tokenizer.stopwords)
+    tokenizer.save_stopwords(save_dir=your_index_dir)
+    new_tokenizer.load_stopwords(your_index_dir)
+    print("stopwords after reloaded:", new_tokenizer.stopwords)
+
+    # cleanup
+    shutil.rmtree(your_index_dir)
 
 
 if __name__ == "__main__":
