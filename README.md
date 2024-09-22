@@ -197,7 +197,7 @@ corpus = [
 
 # Pick your favorite stemmer, and pass 
 stemmer = None
-stopwords = []
+stopwords = ["is"]
 splitter = lambda x: x.split() # function or regex pattern
 # Create a tokenizer
 tokenizer = Tokenizer(
@@ -211,6 +211,19 @@ print("tokens:", corpus_tokens)
 print("vocab:", tokenizer.get_vocab_dict())
 
 # note: the vocab dict will either be a dict of `word -> id` if you don't have a stemmer, and a dict of `stemmed word -> stem id` if you do.
+# You can save the vocab. it's fine to use the same dir as your index if filename doesn't conflict
+tokenizer.save_vocab(save_dir="bm25s_very_big_index")
+
+# loading:
+new_tokenizer = Tokenizer(stemmer=stemmer, stopwords=[], splitter=splitter)
+new_tokenizer.load_vocab("bm25s_very_big_index")
+print("vocab reloaded:", new_tokenizer.get_vocab_dict())
+
+# the same can be done for stopwords
+print("stopwords before reload:", new_tokenizer.stopwords)
+tokenizer.save_stopwords(save_dir="bm25s_very_big_index")
+new_tokenizer.load_stopwords("bm25s_very_big_index")
+print("stopwords reloaded:", new_tokenizer.stopwords)
 ```
 
 You can find advanced examples in [examples/tokenizer_class.py](examples/tokenizer_class.py), including how to:
