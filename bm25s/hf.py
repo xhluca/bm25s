@@ -107,6 +107,32 @@ retriever = BM25HF.load_from_hub("{username}/{repo_name}", local_dir="/path/to/d
 retriever = BM25HF.load_from_hub("{username}/{repo_name}", token=token)
 ```
 
+## Tokenizer
+
+If you have saved a `Tokenizer` object with the index using the following approach:
+
+```python
+from bm25s.hf import TokenizerHF
+
+token = "your_hugging_face_token"
+tokenizer = TokenizerHF(corpus=corpus, stopwords="english")
+tokenizer.save_to_hub("{username}/{repo_name}", token=token)
+
+# and stopwords too
+tokenizer.save_stopwords_to_hub("{username}/{repo_name}", token=token)
+```
+
+Then, you can load the tokenizer using the following code:
+
+```python
+from bm25s.hf import TokenizerHF
+
+tokenizer = TokenizerHF(corpus=corpus, stopwords=[])
+tokenizer.load_vocab_from_hub("{username}/{repo_name}", token=token)
+tokenizer.load_stopwords_from_hub("{username}/{repo_name}", token=token)
+```
+
+
 ## Stats
 
 This dataset was created using the following data:

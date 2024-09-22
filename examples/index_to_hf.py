@@ -55,7 +55,7 @@ def main(user, save_dir="datasets", repo_name="bm25s-scifact-testing", dataset="
     tokenizer.save_vocab_to_hub(repo_id=f"{user}/{repo_name}", token=hf_token)
 
     # you can also load the retriever and tokenizer from the hub
-    tokenizer_new = bm25s.hf.TokenizerHF(stemmer=stemmer)
+    tokenizer_new = bm25s.hf.TokenizerHF(stemmer=stemmer, stopwords=[])
     tokenizer_new.load_vocab_from_hub(repo_id=f"{user}/{repo_name}", token=hf_token)
 
     # You can do the same for stopwords
