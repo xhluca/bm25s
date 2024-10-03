@@ -420,12 +420,12 @@ we show the following results on the NQ dataset (2M+ documents, 100M+ tokens):
 
 We can see that memory-mapping the index allows for a significant reduction in memory usage, with comparable retrieval times. 
 
-Similarly, for MSMARCO (8M+ documents, 300M+ tokens), we show the following results (running on the validation set), although the retrieval did not complete for the in-memory case:
+Similarly, for MSMARCO (8M+ documents, 300M+ tokens), we show the following results (running on the validation set), although the retrieval did not complete for the in-memory case (* denotes that the retrieval did not terminate):
 
-| Method        | Load Index (s) | Retrieval (s) | RAM post-index (GB) | RAM post-retrieve (GB) |
-| ------------- | -------------- | ------------- | ------------------- | ---------------------- |
-| In-memory     | 26.06          | ?          | 10.27               | ?                   |
-| Mmap+Reload   | 1.20           | 101.17        | 1.15                | 1.38                   |
+| Method      | Load Index (s) | Retrieval (s) | RAM post-index (GB) | RAM post-retrieve (GB) |
+| ----------- | -------------- | ------------- | ------------------- | ---------------------- |
+| In-memory   | 26.06          | DNT             | 10.27               | 18.59*                 |
+| Mmap+Reload | 1.20           | 101.17        | 1.15                | 1.38                   |
 
 ## Acknowledgement
 
