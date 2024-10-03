@@ -62,6 +62,18 @@ class Results(NamedTuple):
     documents: np.ndarray
     scores: np.ndarray
 
+    def __len__(self):
+        return len(self.documents)
+
+    @classmethod
+    def merge(cls, results: List["Results"]) -> "Results":
+        """
+        Merge a list of Results objects into a single Results object.
+        """
+        documents = np.concatenate([r.documents for r in results], axis=0)
+        scores = np.concatenate([r.scores for r in results], axis=0)
+        return cls(documents=documents, scores=scores)
+
 
 def get_unique_tokens(
     corpus_tokens, show_progress=True, leave_progress=False, desc="Create Vocab"
