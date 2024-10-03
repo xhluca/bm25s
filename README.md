@@ -408,7 +408,7 @@ For `pyserini`, we use the [recommended installation](https://github.com/castori
 
 Using the `index_nq.py` to create an index, we can retrieve with:
 * `examples/retrieve_nq.py`: setting `mmap=False` in the `main` function to load the index in memory, and `mmap=True` to load the index as a memory-mapped file. 
-* `examples/retrieve_nq_with_batching.py`: This takes it a step further by batching the retrieval process, which allows for reloading the index after each batch. This is useful when you have a large index and want to save memory.
+* `examples/retrieve_nq_with_batching.py`: This takes it a step further by batching the retrieval process, which allows for reloading the index after each batch (see *Mmap+Reload* below). This is useful when you have a large index and want to save memory.
 
 we show the following results on the NQ dataset (2M+ documents, 100M+ tokens):
 
@@ -416,9 +416,16 @@ we show the following results on the NQ dataset (2M+ documents, 100M+ tokens):
 | ------------- | -------------- | ------------- | ------------------- | ---------------------- |
 | In-memory     | 8.61           | 21.09         | 4.36                | 4.45                   |
 | Memory-mapped | 0.53           | 20.22         | 0.49                | 2.16                   |
-| Mmap+Reload after batch | 0.48           | 20.96         | 0.49                | 0.70                   |
+| Mmap+Reload   | 0.48           | 20.96         | 0.49                | 0.70                   |
 
-We can see that memory-mapping the index allows for a significant reduction in memory usage, with comparable retrieval times.
+We can see that memory-mapping the index allows for a significant reduction in memory usage, with comparable retrieval times. 
+
+Similarly, for MSMARCO (8M+ documents, 300M+ tokens), we show the following results (running on the validation set), although the retrieval did not complete for the in-memory case:
+
+| Method        | Load Index (s) | Retrieval (s) | RAM post-index (GB) | RAM post-retrieve (GB) |
+| ------------- | -------------- | ------------- | ------------------- | ---------------------- |
+| In-memory     | 26.06          | ?          | 10.27               | ?                   |
+| Mmap+Reload   | 1.20           | 101.17        | 1.15                | 1.38                   |
 
 ## Acknowledgement
 
