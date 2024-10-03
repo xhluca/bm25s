@@ -30,15 +30,16 @@ import Stemmer
 from tqdm import tqdm
 
 
-def main(index_dir="bm25s_indices/nq", data_dir="datasets", dataset="nq", mmap=True):
+def main(index_dir="bm25s_indices/nq", data_dir="datasets", dataset="nq", split="test", mmap=True):
     if mmap:
         print("Using memory-mapped index (mmap) to reduce memory usage.")
 
     timer = bm25s.utils.benchmark.Timer("[BM25S]")
 
-    print("Loading the queries...")
     queries = bm25s.utils.beir.load_queries(dataset, save_dir=data_dir)
-    queries_lst = [q["text"] for q in queries.values()]
+    qrels = bm25s.utils.beir.load_qrels(dataset, split=split, save_dir=data_dir)
+    queries_lst = [v["text"] for k, v in queries.items() if k in qrels]
+    print(f"Loaded {len(queries_lst)} queries.")
 
     # Tokenize the queries
     stemmer = Stemmer.Stemmer("english")
