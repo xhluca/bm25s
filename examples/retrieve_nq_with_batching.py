@@ -36,9 +36,10 @@ def main(index_dir="bm25s_indices/nq", data_dir="datasets", dataset="nq", bsize=
 
     timer = bm25s.utils.benchmark.Timer("[BM25S]")
 
-    print("Loading the queries...")
     queries = bm25s.utils.beir.load_queries(dataset, save_dir=data_dir)
-    queries_lst = [q["text"] for q in queries.values()]
+    qrels = bm25s.utils.beir.load_qrels(dataset, split="test", save_dir=data_dir)
+    queries_lst = [v["text"] for k, v in queries.items() if k in qrels]
+    print(f"Loaded {len(queries_lst)} queries.")
 
     # Tokenize the queries
     stemmer = Stemmer.Stemmer("english")
