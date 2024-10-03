@@ -867,6 +867,62 @@ class BM25:
             mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name)
             utils.corpus.save_mmindex(mmidx, path=save_dir / corpus_name)
 
+    def load_scores(
+        self, 
+        save_dir,
+        data_name="data.csc.index.npy",
+        indices_name="indices.csc.index.npy",
+        indptr_name="indptr.csc.index.npy",
+        num_docs=None,
+        mmap=False,
+        allow_pickle=False,
+    ):
+        """
+        Load the scores arrays from the BM25 index. This is useful if you want to load
+        the scores arrays separately from the vocab dictionary and the parameters.
+
+        This is called internally by the `load` method, so you do not need to call it directly.
+
+        Parameters
+        ----------
+        data_name : str
+            The name of the file that contains the data array.
+
+        indices_name : str
+            The name of the file that contains the indices array.
+
+        indptr_name : str
+            The name of the file that contains the indptr array.
+
+        mmap : bool
+            Whether to use Memory-map for the np.load function. If false, the arrays will be loaded into memory.
+            If True, the arrays will be memory-mapped, using 'r' mode. This is useful for very large arrays that
+            do not fit into memory.
+
+        allow_pickle : bool
+            If True, the arrays will be loaded using pickle. If False, the arrays will be loaded
+            in a more efficient format, but they will not be readable by older versions of numpy.
+        """
+        save_dir = Path(save_dir)
+
+        data_path = save_dir / data_name
+        indices_path = save_dir / indices_name
+        indptr_path = save_dir / indptr_name
+
+        mmap_mode = "r" if mmap else None
+        data = np.load(data_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
+        indices = np.load(indices_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
+        indptr = np.load(indptr_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
+
+        scores = {}
+        scores["data"] = data
+        scores["indices"] = indices
+        scores["indptr"] = indptr
+        scores["num_docs"] = num_docs
+
+        self.scores = scores
+
+
     @classmethod
     def load(
         cls,
@@ -941,29 +997,22 @@ class BM25:
         with open(vocab_path, "r") as f:
             vocab_dict: dict = json_functions.loads(f.read())
 
-        # Load the score arrays
-        data_path = save_dir / data_name
-        indices_path = save_dir / indices_name
-        indptr_path = save_dir / indptr_name
-
-        mmap_mode = "r" if mmap else None
-        data = np.load(data_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
-        indices = np.load(indices_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
-        indptr = np.load(indptr_path, allow_pickle=allow_pickle, mmap_mode=mmap_mode)
-
         original_version = params.pop("version", None)
-
-        scores = {
-            "data": data,
-            "indices": indices,
-            "indptr": indptr,
-            "num_docs": params.pop("num_docs", None),
-        }
+        num_docs = params.pop("num_docs", None)
 
         bm25_obj = cls(**params)
-        bm25_obj.scores = scores
         bm25_obj.vocab_dict = vocab_dict
         bm25_obj._original_version = original_version
+
+        bm25_obj.load_scores(
+            save_dir=save_dir,
+            data_name=data_name,
+            indices_name=indices_name,
+            indptr_name=indptr_name,
+            mmap=mmap,
+            num_docs=num_docs,
+            allow_pickle=allow_pickle,
+        )
 
         if load_corpus:
             # load the model from the snapshot
