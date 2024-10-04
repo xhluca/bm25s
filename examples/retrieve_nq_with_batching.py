@@ -25,12 +25,14 @@ python examples/retrieve_nq.py
 ```
 """
 
+from pathlib import Path
 import bm25s
 import Stemmer
 from tqdm import tqdm
 
 
-def main(index_dir="bm25s_indices/nq", data_dir="datasets", dataset="nq", split="test", bsize=20):
+def main(index_dir="bm25s_indices/", data_dir="datasets", dataset="nq", split="test", bsize=20):
+    index_dir = Path(index_dir) / dataset
     mmap = True
     print("Using memory-mapped index (mmap) to reduce memory usage.")
 

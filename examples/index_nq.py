@@ -16,11 +16,15 @@ python examples/index_nq.py
 ```
 """
 
+from pathlib import Path
 import bm25s
 import Stemmer
 
 
-def main(save_dir="datasets", index_dir="bm25s_indices/nq", dataset="nq"):
+def main(save_dir="datasets", index_dir="bm25s_indices/", dataset="nq"):
+    index_dir = Path(index_dir) / dataset
+    index_dir.mkdir(parents=True, exist_ok=True)
+    
     print("Downloading the dataset...")
     bm25s.utils.beir.download_dataset(dataset, save_dir=save_dir)
     print("Loading the corpus...")
