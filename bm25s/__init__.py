@@ -937,6 +937,7 @@ class BM25:
         load_corpus=False,
         mmap=False,
         allow_pickle=False,
+        load_vocab=True,
     ):
         """
         Load a BM25S index that was saved using the `save` method.
@@ -980,6 +981,10 @@ class BM25:
         allow_pickle : bool
             If True, the arrays will be loaded using pickle. If False, the arrays will be loaded
             in a more efficient format, but they will not be readable by older versions of numpy.
+        
+        load_vocab : bool
+            If True, the vocab dictionary will be loaded from the `vocab_name` file. If False, the vocab dictionary
+            will not be loaded, and the `vocab_dict` attribute of the BM25 object will be set to None.
         """
         if not isinstance(mmap, bool):
             raise ValueError("`mmap` must be a boolean")
@@ -993,10 +998,13 @@ class BM25:
             params: dict = json_functions.loads(f.read())
 
         # Load the vocab dictionary
-        vocab_path = save_dir / vocab_name
-        with open(vocab_path, "r") as f:
-            vocab_dict: dict = json_functions.loads(f.read())
-
+        if load_vocab:
+            vocab_path = save_dir / vocab_name
+            with open(vocab_path, "r") as f:
+                vocab_dict: dict = json_functions.loads(f.read())
+        else:
+            vocab_dict = None
+        
         original_version = params.pop("version", None)
         num_docs = params.pop("num_docs", None)
 
