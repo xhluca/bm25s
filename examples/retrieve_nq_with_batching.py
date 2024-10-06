@@ -1,8 +1,9 @@
 """
 # Example: Retrieve from pre-built index of Natural Questions
 
-This shows how to load an index built with BM25.index and saved with BM25.save, and retrieve
-the top-k results for a set of queries from the Natural Questions dataset, via BEIR library.
+This is a modified version of the `examples/retrieve_nq.py` script that uses batching to
+even reduce memory usage further. This script loads the queries in batches and retrieves
+the top-k results for each batch, clearing the memory after each batch.
 
 To run this example, you need to install the following dependencies:
 
@@ -25,17 +26,15 @@ python examples/retrieve_nq.py
 """
 
 from pathlib import Path
-import numpy as np
 import bm25s
 import Stemmer
 from tqdm import tqdm
 
 
-def main(index_dir="bm25s_indices", data_dir="datasets", dataset="nq", split="test", mmap=True):
+def main(index_dir="bm25s_indices/", data_dir="datasets", dataset="nq", split="test", bsize=20):
     index_dir = Path(index_dir) / dataset
-    
-    if mmap:
-        print("Using memory-mapped index (mmap) to reduce memory usage.")
+    mmap = True
+    print("Using memory-mapped index (mmap) to reduce memory usage.")
 
     timer = bm25s.utils.benchmark.Timer("[BM25S]")
 
@@ -56,7 +55,7 @@ def main(index_dir="bm25s_indices", data_dir="datasets", dataset="nq", split="te
     t = timer.start("Loading index")
     retriever = bm25s.BM25.load(index_dir, mmap=mmap, load_corpus=True)
     retriever.backend = "numba"
-    num_docs = retriever.scores['num_docs']
+    num_docs = retriever.scores["num_docs"]
     timer.stop(t, show=True, n_total=num_docs)
 
     mem_use = bm25s.utils.benchmark.get_max_memory_usage()
@@ -64,7 +63,19 @@ def main(index_dir="bm25s_indices", data_dir="datasets", dataset="nq", split="te
 
     print("Retrieving the top-k results...")
     t = timer.start("Retrieving")
-    results = retriever.retrieve(queries_tokenized, k=10)
+
+    batches = []
+
+    for i in tqdm(range(0, len(queries_lst), bsize)):
+        batches.append(retriever.retrieve(queries_tokenized[i : i + bsize], k=10))
+        
+        # reload the corpus and scores to free up memory
+        retriever.load_scores(save_dir=index_dir, mmap=mmap, num_docs=num_docs)
+        if isinstance(retriever.corpus, bm25s.utils.corpus.JsonlCorpus):
+            retriever.corpus.load()
+
+    results = bm25s.Results.merge(batches)
+
     timer.stop(t, show=True, n_total=len(queries_lst))
 
     # get memory usage
@@ -78,4 +89,4 @@ def main(index_dir="bm25s_indices", data_dir="datasets", dataset="nq", split="te
 
 
 if __name__ == "__main__":
-    main(mmap=True)
+    main()

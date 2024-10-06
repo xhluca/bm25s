@@ -1,6 +1,6 @@
 from copy import deepcopy
 import time
-
+import sys
 
 try:
     import resource
@@ -16,6 +16,11 @@ def get_max_memory_usage(format="GB"):
         raise ValueError("format should be one of 'GB', 'MB', 'KB'")
 
     usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # for mac, ru_maxrss is in bytes
+    
+    if sys.platform == "darwin":
+        usage_kb /= 1024
+    
     if format == "GB":
         return usage_kb / (1024**2)
     elif format == "MB":

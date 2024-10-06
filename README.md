@@ -351,23 +351,23 @@ Here are some benchmarks comparing `bm25s` to other popular BM25 implementations
 
 We compare the throughput of the BM25 implementations on various datasets. The throughput is measured in queries per second (QPS), on a single-threaded Intel Xeon CPU @ 2.70GHz (found on Kaggle). For BM25S, we take the average of 10 runs. Instances exceeding 60 queries/s are in **bold**.
 
-| Dataset          |   BM25S | Elastic | BM25-PT | Rank-BM25 |
-| :--------------- | ------: | ------: | ------: | --------: |
-| arguana          |  **573.91** |   13.67 |  **110.51** |         2 |
-| climate-fever    |   13.09 |    4.02 |     OOM |      0.03 |
-| cqadupstack      |  **170.91** |   13.38 |     OOM |      0.77 |
-| dbpedia-entity   |   13.44 |   10.68 |     OOM |      0.11 |
-| fever            |   20.19 |    7.45 |     OOM |      0.06 |
-| fiqa             |  **507.03** |   16.96 |   20.52 |      4.46 |
-| hotpotqa         |   20.88 |    7.11 |     OOM |      0.04 |
-| msmarco          |    12.2 |   11.88 |     OOM |      0.07 |
-| nfcorpus         | **1196.16** |   45.84 |  256.67 |    **224.66** |
-| nq               |   41.85 |   12.16 |     OOM |       0.1 |
-| quora            |  **183.53** |    21.8 |    6.49 |      1.18 |
-| scidocs          |  **767.05** |   17.93 |   41.34 |      9.01 |
-| scifact          |  **952.92** |   20.81 |   **184.3** |      47.6 |
-| trec-covid       |   **85.64** |    7.34 |    3.73 |      1.48 |
-| webis-touche2020 |   **60.59** |   13.53 |     OOM |       1.1 |
+| Dataset          |       BM25S | Elastic |    BM25-PT |  Rank-BM25 |
+| :--------------- | ----------: | ------: | ---------: | ---------: |
+| arguana          |  **573.91** |   13.67 | **110.51** |          2 |
+| climate-fever    |       13.09 |    4.02 |        OOM |       0.03 |
+| cqadupstack      |  **170.91** |   13.38 |        OOM |       0.77 |
+| dbpedia-entity   |       13.44 |   10.68 |        OOM |       0.11 |
+| fever            |       20.19 |    7.45 |        OOM |       0.06 |
+| fiqa             |  **507.03** |   16.96 |      20.52 |       4.46 |
+| hotpotqa         |       20.88 |    7.11 |        OOM |       0.04 |
+| msmarco          |        12.2 |   11.88 |        OOM |       0.07 |
+| nfcorpus         | **1196.16** |   45.84 |     256.67 | **224.66** |
+| nq               |       41.85 |   12.16 |        OOM |        0.1 |
+| quora            |  **183.53** |    21.8 |       6.49 |       1.18 |
+| scidocs          |  **767.05** |   17.93 |      41.34 |       9.01 |
+| scifact          |  **952.92** |   20.81 |  **184.3** |       47.6 |
+| trec-covid       |   **85.64** |    7.34 |       3.73 |       1.48 |
+| webis-touche2020 |   **60.59** |   13.53 |        OOM |        1.1 |
 
 More detailed benchmarks can be found in the [bm25-benchmarks repo](https://github.com/xhluca/bm25-benchmarks).
 
@@ -406,14 +406,27 @@ For `pyserini`, we use the [recommended installation](https://github.com/castori
 
 `bm25s` allows considerable memory saving through the use of *memory-mapping*, which allows the index to be stored on disk and loaded on demand. 
 
-When testing with 6 arbitrary queries with an index built with MS MARCO (8.8M documents, 300M+ tokens), we have the following:
+Using the `index_nq.py` to create an index, we can retrieve with:
+* `examples/retrieve_nq.py`: setting `mmap=False` in the `main` function to load the index in memory, and `mmap=True` to load the index as a memory-mapped file. 
+* `examples/retrieve_nq_with_batching.py`: This takes it a step further by batching the retrieval process, which allows for reloading the index after each batch (see *Mmap+Reload* below). This is useful when you have a large index and want to save memory.
 
-| Method | Load Index (s) | Retrieval (s) | RAM usage (GB) |
-| ------ | ----------------- | ------------- | -------------- |
-| Memory-mapped | 0.62 | 0.18 | 0.90 |
-| In-memory | 11.41 | 0.74 | 10.56 |
+we show the following results on the NQ dataset (2M+ documents, 100M+ tokens):
 
-When you run `bm25s` on 1000 queries on the Natural Questions dataset (2M+ documents), the memory usage is over 50% lower than the in-memory version with trivial difference in speed. You can find more information in the [GitHub repository](https://github.com/xhluca/bm25s).
+| Method        | Load Index (s) | Retrieval (s) | RAM post-index (GB) | RAM post-retrieve (GB) |
+| ------------- | -------------- | ------------- | ------------------- | ---------------------- |
+| In-memory     | 8.61           | 21.09         | 4.36                | 4.45                   |
+| Memory-mapped | 0.53           | 20.22         | 0.49                | 2.16                   |
+| Mmap+Reload   | 0.48           | 20.96         | 0.49                | 0.70                   |
+
+We can see that memory-mapping the index allows for a significant reduction in memory usage, with comparable retrieval times. 
+
+Similarly, for MSMARCO (8M+ documents, 300M+ tokens), we show the following results (running on the validation set), although the retrieval did not complete for the in-memory case (* denotes that the retrieval did not terminate):
+
+| Method        | Load Index (s) | Retrieval (s) | RAM post-index (GB) | RAM post-retrieve (GB) |
+| ------------- | -------------- | ------------- | ------------------- | ---------------------- |
+| In-memory     | 25.71          | 93.66         | 10.21               | 10.34                  |
+| Memory-mapped | 1.24           | 90.41         | 1.14                | 4.88                   |
+| Mmap+Reload   | 1.17           | 97.89         | 1.14                | 1.38                   |
 
 ## Acknowledgement
 
