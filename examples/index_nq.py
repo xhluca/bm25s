@@ -35,17 +35,21 @@ def main(save_dir="datasets", index_dir="bm25s_indices/", dataset="nq"):
     corpus_lst = [r["title"] + " " + r["text"] for r in corpus_records]
 
     stemmer = Stemmer.Stemmer("english")
-    corpus_tokenized = bm25s.tokenize(corpus_lst, stemmer=stemmer)
+    tokenizer = bm25s.tokenization.Tokenizer(stemmer=stemmer)
+    corpus_tokens = tokenizer.tokenize(corpus_lst, return_as="tuple")
 
-    retriever = bm25s.BM25(corpus=corpus_records)
-    retriever.index(corpus_tokenized)
-    print("Created BM25 index.")
+    retriever = bm25s.BM25(corpus=corpus_records, backend="numba")
+    retriever.index(corpus_tokens)
+    
     retriever.save(index_dir)
+    tokenizer.save_vocab(index_dir)
+    tokenizer.save_stopwords(index_dir)
     print(f"Saved the index to {index_dir}.")
+    
     # get memory usage
     mem_use = bm25s.utils.benchmark.get_max_memory_usage()
     print(f"Peak memory usage: {mem_use:.2f} GB")
 
 
 if __name__ == "__main__":
-    main()
+    main(dataset='msmarco')
