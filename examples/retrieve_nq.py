@@ -44,15 +44,23 @@ def main(index_dir="bm25s_indices", data_dir="datasets", dataset="nq", split="te
     queries_lst = [v["text"] for k, v in queries.items() if k in qrels]
     print(f"Loaded {len(queries_lst)} queries.")
 
-    # Tokenize the queries
     stemmer = Stemmer.Stemmer("english")
+    
+    # Tokenize the queries
     queries_tokenized = bm25s.tokenize(queries_lst, stemmer=stemmer, return_ids=False)
+    
+    # # Alternatively, you can use the following code to tokenize the queries
+    # # using the saved tokenizer from the index directory
+    # tokenizer = bm25s.tokenization.Tokenizer(stemmer=stemmer)
+    # tokenizer.load_stopwords(index_dir)
+    # tokenizer.load_vocab(index_dir)
+    # queries_tokenized = tokenizer.tokenize(queries_lst, update_vocab=False)
 
     mem_use = bm25s.utils.benchmark.get_max_memory_usage()
     print(f"Initial memory usage: {mem_use:.2f} GB")
 
     # Load the BM25 index and retrieve the top-k results
-    print("Loading the BM25 index...")
+    print(f"Loading the BM25 index for: {dataset}")
     t = timer.start("Loading index")
     retriever = bm25s.BM25.load(index_dir, mmap=mmap, load_corpus=True)
     retriever.backend = "numba"
