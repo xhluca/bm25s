@@ -533,6 +533,9 @@ def tokenize(
     for text in tqdm(
         texts, desc="Split strings", leave=leave, disable=not show_progress
     ):
+        if text == "":
+            raise ValueError("An empty string was passed to the tokenizer. Make sure your input strings are valid.")
+        
         stopwords_set = set(stopwords)
         if lower:
             text = text.lower()
