@@ -217,6 +217,9 @@ class Tokenizer:
         using_stemmer = self.stemmer is not None
 
         for text in texts:
+            if text == "":
+                raise ValueError("An empty string was passed to the tokenizer. Make sure your input strings are valid.")
+            
             if self.lower:
                 text = text.lower()
 
