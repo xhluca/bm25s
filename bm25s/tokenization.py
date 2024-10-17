@@ -193,7 +193,7 @@ class Tokenizer:
             self.stopwords = json_functions.loads(f.read())
 
     def streaming_tokenize(
-        self, texts: List[str], update_vocab: Union[bool, str] = True
+        self, texts: List[str], update_vocab: Union[bool, str] = True, allow_empty: bool = True
     ):
         """
         Tokenize a list of strings and return a generator of token IDs.
@@ -211,19 +211,24 @@ class Tokenizer:
             the function will never update the vocabulary, even if the stemmed word is in
             the stem_to_sid dictionary. Note that update_vocab="if_empty" is not supported
             in this method, only in the `tokenize` method.
+        
+        allow_empty : bool, optional
+            Whether to allow the splitter to return an empty string. If False, the splitter 
+            will return an empty list, which may cause issues if the tokenizer is not expecting
+            an empty list. If True, the splitter will return a list with a single empty string.
         """
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
         using_stopwords = stopwords_set is not None
         using_stemmer = self.stemmer is not None
 
         for text in texts:
-            if text == "":
-                raise ValueError("An empty string was passed to the tokenizer. Make sure your input strings are valid.")
-            
             if self.lower:
                 text = text.lower()
 
             splitted_words = self.splitter(text)
+
+            if allow_empty is False and len(splitted_words) == 0:
+                splitted_words = [""]
 
             doc_ids = []
             for word in splitted_words:
@@ -276,6 +281,7 @@ class Tokenizer:
         show_progress: bool = True,
         length: Union[int, None] = None,
         return_as: str = "ids",
+        allow_empty: bool = True,
     ) -> Union[List[List[int]], List[List[str]], typing.Generator, Tokenized]:
         """
         Tokenize a list of strings and return the token IDs.
@@ -316,6 +322,11 @@ class Tokenizer:
             If "string", this return a list of lists of strings, each string being a token.
             If "ids", this return a list of lists of integers corresponding to the token IDs,
             or stemmed IDs if a stemmer is used.
+        
+        allow_empty : bool, optional
+            Whether to allow the splitter to return an empty string. If False, the splitter 
+            will return an empty list, which may cause issues if the tokenizer is not expecting
+            an empty list. If True, the splitter will return a list with a single empty string.
 
         Returns
         -------
@@ -340,7 +351,7 @@ class Tokenizer:
         if update_vocab == "if_empty":
             update_vocab = len(self.word_to_id) == 0
 
-        stream_fn = self.streaming_tokenize(texts=texts, update_vocab=update_vocab)
+        stream_fn = self.streaming_tokenize(texts=texts, update_vocab=update_vocab, allow_empty=allow_empty)
 
         if return_as == "stream":
             return stream_fn
@@ -465,6 +476,7 @@ def tokenize(
     return_ids: bool = True,
     show_progress: bool = True,
     leave: bool = False,
+    allow_empty: bool = True,
 ) -> Union[List[List[str]], Tokenized]:
     """
     Tokenize a list using the same method as the scikit-learn CountVectorizer,
@@ -515,6 +527,10 @@ def tokenize(
         Whether to leave the progress bar after completion. If False, the progress bar
         will disappear after completion. If True, the progress bar will stay on the screen.
 
+    allow_empty : bool, optional
+        Whether to allow the splitter to return an empty string. If False, the splitter 
+        will return an empty list, which may cause issues if the tokenizer is not expecting
+        an empty list. If True, the splitter will return a list with a single empty string.
     Note
     -----
     You may pass a single string or a list of strings. If you pass a single string,
@@ -532,15 +548,16 @@ def tokenize(
 
     for text in tqdm(
         texts, desc="Split strings", leave=leave, disable=not show_progress
-    ):
-        if text == "":
-            raise ValueError("An empty string was passed to the tokenizer. Make sure your input strings are valid.")
-        
+    ):  
         stopwords_set = set(stopwords)
         if lower:
             text = text.lower()
 
         splitted = split_fn(text)
+
+        if allow_empty is False and len(splitted) == 0:
+            splitted = [""]
+        
         doc_ids = []
 
         for token in splitted:
