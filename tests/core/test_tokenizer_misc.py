@@ -1,3 +1,7 @@
+"""
+Miscellaneous tests for the tokenizer module.
+"""
+
 import unittest
 
 import numpy as np
@@ -6,7 +10,7 @@ import bm25s
 from bm25s.tokenization import Tokenizer
 
 
-class TestBM25SLoadingSaving(unittest.TestCase):
+class TestBM25SNewIds(unittest.TestCase):
     def test_empty_string(self):
         # Create an empty corpus
         corpus = ["", "", "", ""]
@@ -39,5 +43,31 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         results, scores = retriever.retrieve(query_tokens, corpus=corpus, k=2)
         self.assertTrue(
             np.all(results == np.array([["", ""]])),
+            msg=f"Results differ from expected: {results}, {scores}",
+        )
+
+    def test_new_ids(self):
+        corpus = [
+            "a cat is a feline and likes to purr",
+            "a dog is the human's best friend and loves to play",
+            "a bird is a beautiful animal that can fly",
+            "a fish is a creature that lives in water and swims",
+        ]
+
+        tokenizer = Tokenizer(
+            stemmer=None, stopwords=None, splitter=lambda x: x.split()
+        )
+        corpus_tokens = tokenizer.tokenize(corpus)
+
+        bm25 = bm25s.BM25()
+        bm25.index(corpus_tokens)
+
+        query = "What is a fly?"
+        query_tokens = tokenizer.tokenize([query], update_vocab=True)
+        self.assertListEqual([[27, 2, 0, 28]], query_tokens)
+
+        results, scores = bm25.retrieve(query_tokens, k=3)
+        self.assertTrue(
+            np.all(np.array([[0, 2, 3]]) == results),
             msg=f"Results differ from expected: {results}, {scores}",
         )
