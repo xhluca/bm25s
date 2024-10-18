@@ -225,11 +225,11 @@ class Tokenizer:
             if self.lower:
                 text = text.lower()
 
-            splitted_words = self.splitter(text)
+            splitted_words = list(self.splitter(text))
 
-            if allow_empty is False and len(splitted_words) == 0:
+            if allow_empty is True and len(splitted_words) == 0:
                 splitted_words = [""]
-
+            
             doc_ids = []
             for word in splitted_words:
                 if word in self.word_to_id:
@@ -270,6 +270,14 @@ class Tokenizer:
                         wid = len(self.word_to_id)
                         self.word_to_id[word] = wid
                         doc_ids.append(wid)
+
+            if len(doc_ids) == 0 and allow_empty is True:
+                if update_vocab is True and "" not in self.word_to_id:
+                    self.word_to_id[""] = max(self.word_to_id.values()) + 1
+                
+                # get the ID for the empty string
+                if "" in self.word_to_id:
+                    doc_ids = [self.word_to_id[""]]
 
             yield doc_ids
 
