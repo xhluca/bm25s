@@ -618,7 +618,10 @@ class BM25:
         if n_threads == -1:
             n_threads = os.cpu_count()
 
-        if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
+        if isinstance(query_tokens, tokenization.Tokenized):
+            query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
+        
+        elif isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(query_tokens):
             if len(query_tokens) != 2:
                 msg = (
                     "Expected a list of string or a tuple of two elements: the first element is the "
@@ -639,8 +642,13 @@ class BM25:
                     )
                 query_tokens = tokenization.Tokenized(ids=ids, vocab=vocab)
 
-        if isinstance(query_tokens, tokenization.Tokenized):
-            query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
+        # otherwise, if it's a list of list of tokens ids (int), we can remove any integer
+        # that is not in the vocab_dict
+        elif is_list_of_list_of_type(query_tokens, type_=int):
+            query_tokens = [
+                [token_id for token_id in query if token_id in self.vocab_dict]
+                for query in query_tokens
+            ]
         
         corpus = corpus if corpus is not None else self.corpus
 
