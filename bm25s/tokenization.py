@@ -273,7 +273,7 @@ class Tokenizer:
 
             if len(doc_ids) == 0 and allow_empty is True:
                 if update_vocab is True and "" not in self.word_to_id:
-                    self.word_to_id[""] = max(self.word_to_id.values()) + 1
+                    self.word_to_id[""] = max(self.word_to_id.values(), default=0) + 1
                 
                 # get the ID for the empty string
                 if "" in self.word_to_id:
