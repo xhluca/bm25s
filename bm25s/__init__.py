@@ -480,10 +480,7 @@ class BM25:
         int_dtype = np.dtype(self.int_dtype)
         query_tokens_ids: np.ndarray = np.asarray(query_tokens_ids, dtype=int_dtype)
 
-        if len(query_tokens_ids) == 0:
-            max_token_id = 0
-        else:
-            max_token_id = query_tokens_ids.max()
+        max_token_id = int(query_tokens_ids.max(initial=0))
         
         if max_token_id >= len(indptr) - 1:
             raise ValueError(
