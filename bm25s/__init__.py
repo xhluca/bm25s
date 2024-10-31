@@ -478,9 +478,13 @@ class BM25:
 
         dtype = np.dtype(self.dtype)
         int_dtype = np.dtype(self.int_dtype)
-        query_tokens_ids = np.asarray(query_tokens_ids, dtype=int_dtype)
+        query_tokens_ids: np.ndarray = np.asarray(query_tokens_ids, dtype=int_dtype)
 
-        max_token_id = query_tokens_ids.max()
+        if len(query_tokens_ids) == 0:
+            max_token_id = 0
+        else:
+            max_token_id = query_tokens_ids.max()
+        
         if max_token_id >= len(indptr) - 1:
             raise ValueError(
                 f"The maximum token ID in the query ({max_token_id}) is higher than the number of tokens in the index."
