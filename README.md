@@ -33,8 +33,12 @@ Below, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25
 
 ![comparison](assets/comparison.png)
 
-<details>
-<summary>Click to show citation</summary><br>
+> [!IMPORTANT]
+> New in version 0.2.0: We are rolling out support for a numba backend, which gives around [2x speedup for larger datasets](https://github.com/xhluca/bm25-benchmarks?tab=readme-ov-file#queries-per-second)! Learn more about it and share your thoughts in [the version 0.2.0 release thread](https://github.com/xhluca/bm25s/discussions/58).
+
+
+<details open>
+<summary>Show/Hide citation</summary><br>
 
 ```
 @misc{bm25s,
@@ -44,14 +48,11 @@ Below, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25
       eprint={2407.03618},
       archivePrefix={arXiv},
       primaryClass={cs.IR},
-      url={https://arxiv.org/abs/2407.03618}, 
+      url={https://arxiv.org/abs/2407.03618},
 }
 ```
 
 </details>
-
-> [!IMPORTANT]
-> New in version 0.2.0: We are rolling out support for a numba backend, which gives around [2x speedup for larger datasets](https://github.com/xhluca/bm25-benchmarks?tab=readme-ov-file#queries-per-second)! Learn more about it and share your thoughts in [the version 0.2.0 release thread](https://github.com/xhluca/bm25s/discussions/58).
 
 ## Installation
 
