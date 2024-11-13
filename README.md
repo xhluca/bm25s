@@ -18,6 +18,9 @@
             <td>
                   <a href="https://huggingface.co/blog/xhluca/bm25s">🤗 Blog Post</a>
             </td>
+            <td>
+                  <a href="#installation">🛠️ Installation</a>
+            </td>
       </tr>
 </table>
 
