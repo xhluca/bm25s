@@ -876,8 +876,8 @@ class BM25:
         # Save the vocab dictionary
         vocab_path = save_dir / vocab_name
 
-        with open(vocab_path, "w") as f:
-            f.write(json_functions.dumps(self.vocab_dict))
+        with open(vocab_path, "wt", encoding='utf-8') as f:  
+            json.dump(self.vocab_dict, f, ensure_ascii=False)
 
         # Save the parameters
         params_path = save_dir / params_name
@@ -1060,7 +1060,7 @@ class BM25:
         # Load the vocab dictionary
         if load_vocab:
             vocab_path = save_dir / vocab_name
-            with open(vocab_path, "r") as f:
+            with open(vocab_path, "r",encoding='utf-8') as f:
                 vocab_dict: dict = json_functions.loads(f.read())
         else:
             vocab_dict = None

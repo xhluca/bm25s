@@ -25,6 +25,11 @@ class TestBM25SLoadingSaving(unittest.TestCase):
             "a dog is the human's best friend and loves to play",
             "a bird is a beautiful animal that can fly",
             "a fish is a creature that lives in water and swims",
+            "שלום חברים, איך אתם היום?",
+            "El café está muy caliente",
+            "今天的天气真好!",
+            "Как дела?",
+            "Türkçe öğreniyorum."
         ]
 
         # optional: create a stemmer
