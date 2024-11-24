@@ -876,9 +876,9 @@ class BM25:
         # Save the vocab dictionary
         vocab_path = save_dir / vocab_name
 
-        with open(vocab_path, "wt", encoding='utf-8') as f:  
-            json.dump(self.vocab_dict, f, ensure_ascii=False)
-
+        with open(vocab_path, "wt", encoding='utf-8') as f:
+            f.write(json_functions.dumps(self.vocab_dict, ensure_ascii=False))
+            
         # Save the parameters
         params_path = save_dir / params_name
         params = dict(
