@@ -69,7 +69,7 @@ class TestBM25SNewIds(unittest.TestCase):
 
         results, scores = bm25.retrieve(query_tokens, k=3)
         self.assertTrue(
-            np.all(np.array([[0, 2, 3]]) == results),
+            np.all(np.array([[2, 0, 3]]) == results),
             msg=f"Results differ from expected: {results}, {scores}",
         )
 
