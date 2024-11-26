@@ -25,6 +25,11 @@ class TestBM25SLoadingSaving(unittest.TestCase):
             "a dog is the human's best friend and loves to play",
             "a bird is a beautiful animal that can fly",
             "a fish is a creature that lives in water and swims",
+            "שלום חברים, איך אתם היום?",
+            "El café está muy caliente",
+            "今天的天气真好!",
+            "Как дела?",
+            "Türkçe öğreniyorum."
         ]
 
         # optional: create a stemmer
@@ -119,6 +124,51 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         self.test_b_load()
 
 
+    @classmethod
+    def tearDownClass(cls):
+        # remove the temp dir with rmtree
+        shutil.rmtree(cls.tmpdirname)
+
+
+class TestBM25SNonASCIILoadingSaving(unittest.TestCase):
+    orjson_should_not_be_installed = False
+    orjson_should_be_installed = True
+
+    @classmethod
+    def setUpClass(cls):
+        # check that import orjson fails
+        import bm25s
+
+        cls.text =["Thanks for your great work!"] # this works fine
+        cls.text = ['שלום חברים'] # this crashes!
+        
+        # create a vocabulary
+        tokens = [ t.split() for t in cls.text ]
+        unique_tokens = set([item for sublist in tokens for item in sublist])
+        vocab_token2id = {token: i for i, token in enumerate(unique_tokens)}
+
+        # create a tokenized corpus
+        token_ids = [ [vocab_token2id[token] for token in text_tokens if token in vocab_token2id] for text_tokens in tokens ]        
+        corpus_tokens = bm25s.tokenization.Tokenized(ids=token_ids, vocab=vocab_token2id)
+
+        # create a retriever
+        cls.retriever = bm25s.BM25()
+        cls.retriever.index(corpus_tokens)
+        cls.tmpdirname = tempfile.mkdtemp()
+    
+    
+    def setUp(self):
+        # verify that orjson is properly installed
+        try:
+            import orjson
+        except ImportError:
+            self.fail("orjson should be installed to run this test.")
+
+    def test_a_save_and_load(self):
+        # both of these fail: UnicodeEncodeError: 'charmap' codec can't encode characters in position 2-6: character maps to <undefined>
+        self.retriever.save(self.tmpdirname, corpus=self.text) 
+        self.retriever.load(self.tmpdirname, load_corpus=True)
+    
     @classmethod
     def tearDownClass(cls):
         # remove the temp dir with rmtree

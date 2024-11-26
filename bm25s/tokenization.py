@@ -121,13 +121,13 @@ class Tokenizer:
         path = save_dir / vocab_name
 
         save_dir.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
+        with open(path, "w", encoding='utf-8') as f:
             d = {
                 "word_to_stem": self.word_to_stem,
                 "stem_to_sid": self.stem_to_sid,
                 "word_to_id": self.word_to_id,
             }
-            f.write(json_functions.dumps(d))
+            f.write(json_functions.dumps(d, ensure_ascii=False))
         
     def load_vocab(self, save_dir: str, vocab_name: str = "vocab.tokenizer.json"):
         """
@@ -150,7 +150,7 @@ class Tokenizer:
         """
         path = Path(save_dir) / vocab_name
 
-        with open(path, "r") as f:
+        with open(path, "r", encoding='utf-8') as f:
             d = json_functions.loads(f.read())
             self.word_to_stem = d["word_to_stem"]
             self.stem_to_sid = d["stem_to_sid"]
