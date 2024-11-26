@@ -108,8 +108,9 @@ retriever.index(corpus_tokens)
 query = "does the fish purr like a cat?"
 query_tokens = bm25s.tokenize(query, stemmer=stemmer)
 
-# Get top-k results as a tuple of (doc ids, scores). Both are arrays of shape (n_queries, k)
-results, scores = retriever.retrieve(query_tokens, corpus=corpus, k=2)
+# Get top-k results as a tuple of (doc ids, scores). Both are arrays of shape (n_queries, k).
+# To return docs instead of IDs, set the `corpus=corpus` parameter.
+results, scores = retriever.retrieve(query_tokens, k=2)
 
 for i in range(results.shape[1]):
     doc, score = results[0, i], scores[0, i]
