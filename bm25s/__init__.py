@@ -659,7 +659,7 @@ class BM25:
             query_tokens_filtered = []
             for query in query_tokens:
                 query_filtered = [
-                    token_id for token_id in query if token_id in self.vocab_dict
+                    token_id for token_id in query if token_id in self.vocab_dict.values()
                 ]
                 if len(query_filtered) == 0:
                     if "" not in self.vocab_dict:
