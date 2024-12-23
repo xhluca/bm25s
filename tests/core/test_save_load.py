@@ -138,24 +138,23 @@ class TestBM25SNonASCIILoadingSaving(unittest.TestCase):
     def setUpClass(cls):
         # check that import orjson fails
         import bm25s
-
-        cls.text =["Thanks for your great work!"] # this works fine
-        cls.text = ['שלום חברים'] # this crashes!
-        
-        # create a vocabulary
-        tokens = [ t.split() for t in cls.text ]
-        unique_tokens = set([item for sublist in tokens for item in sublist])
-        vocab_token2id = {token: i for i, token in enumerate(unique_tokens)}
-
-        # create a tokenized corpus
-        token_ids = [ [vocab_token2id[token] for token in text_tokens if token in vocab_token2id] for text_tokens in tokens ]        
-        corpus_tokens = bm25s.tokenization.Tokenized(ids=token_ids, vocab=vocab_token2id)
-
-        # create a retriever
-        cls.retriever = bm25s.BM25()
+        cls.corpus = [
+            "a cat is a feline and likes to purr",
+            "a dog is the human's best friend and loves to play",
+            "a bird is a beautiful animal that can fly",
+            "a fish is a creature that lives in water and swims",
+            "שלום חברים, איך אתם היום?",
+            "El café está muy caliente",
+            "今天的天气真好!",
+            "Как дела?",
+            "Türkçe öğreniyorum.",
+            'שלום חברים'
+        ]
+        corpus_tokens = bm25s.tokenize(cls.corpus, stopwords="en")
+        cls.retriever = bm25s.BM25(corpus=cls.corpus)
         cls.retriever.index(corpus_tokens)
         cls.tmpdirname = tempfile.mkdtemp()
-    
+     
     
     def setUp(self):
         # verify that orjson is properly installed
@@ -166,7 +165,7 @@ class TestBM25SNonASCIILoadingSaving(unittest.TestCase):
 
     def test_a_save_and_load(self):
         # both of these fail: UnicodeEncodeError: 'charmap' codec can't encode characters in position 2-6: character maps to <undefined>
-        self.retriever.save(self.tmpdirname, corpus=self.text) 
+        self.retriever.save(self.tmpdirname, corpus=self.corpus) 
         self.retriever.load(self.tmpdirname, load_corpus=True)
     
     @classmethod
