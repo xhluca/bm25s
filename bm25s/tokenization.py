@@ -220,7 +220,17 @@ class Tokenizer:
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
         using_stopwords = stopwords_set is not None
         using_stemmer = self.stemmer is not None
-
+            
+        if allow_empty is True and update_vocab is True and "" not in self.word_to_id:
+            idx = max(self.word_to_id.values(), default=-1) + 1
+            self.word_to_id[""] = idx
+            
+            if using_stemmer:
+                if "" not in self.word_to_stem:
+                    self.word_to_stem[""] = ""
+                if "" not in self.stem_to_sid:
+                    self.stem_to_sid[""] = idx
+        
         for text in texts:
             if self.lower:
                 text = text.lower()
@@ -272,20 +282,8 @@ class Tokenizer:
                         doc_ids.append(wid)
 
             if len(doc_ids) == 0 and allow_empty is True:
-                if update_vocab is True and "" not in self.word_to_id:
-                    idx = max(self.word_to_id.values(), default=-1) + 1
-                    self.word_to_id[""] = idx
-                    
-                    if using_stemmer:
-                        if "" not in self.word_to_stem:
-                            self.word_to_stem[""] = ""
-                        if "" not in self.stem_to_sid:
-                            self.stem_to_sid[""] = idx
-                
-                # get the ID for the empty string
-                if "" in self.word_to_id:
-                    doc_ids = [self.word_to_id[""]]
-
+                doc_ids = [self.word_to_id[""]]
+            
             yield doc_ids
 
     def tokenize(
