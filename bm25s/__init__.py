@@ -477,6 +477,10 @@ class BM25:
             )
 
         if create_empty_token:
+            if all(isinstance(token, int) for token in vocab_dict):
+                # if all tokens are integers, we don't need to add an empty token
+                pass
+            
             if "" not in vocab_dict:
                 vocab_dict[""] = max(vocab_dict.values()) + 1
 
