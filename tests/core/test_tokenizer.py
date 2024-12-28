@@ -6,6 +6,8 @@ import unittest
 import Stemmer
 import re
 
+import numpy as np
+
 from bm25s.tokenization import Tokenizer
 
 class TestTokenizer(unittest.TestCase):
@@ -209,6 +211,20 @@ class TestTokenizer(unittest.TestCase):
 
         # Check if the stopwords are loaded correctly
         self.assertEqual(stopwords, tuple(tokenizer2.stopwords))
+
+    def test_empty_sentence_and_unknown_word(self):
+        corpus = [
+            "a cat is a feline and likes to purr",
+            "a dog is the human's best friend and loves to play",
+            "a bird is a beautiful animal that can fly",
+            "a fish is a creature that lives in water and swims",
+        ]
+        new_docs = ["cat", "", "potato"]
+        tokenizer = Tokenizer(stopwords="en")
+        corpus_tokens = tokenizer.tokenize(corpus)
+        new_docs_tokens = tokenizer.tokenize(new_docs)
+
+        self.assertTrue(np.all(new_docs_tokens == np.array([[1], [0], [0]])))
 
     @classmethod
     def tearDownClass(cls):
