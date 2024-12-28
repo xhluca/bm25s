@@ -281,7 +281,7 @@ class Tokenizer:
                         self.word_to_id[word] = wid
                         doc_ids.append(wid)
 
-            if len(doc_ids) == 0 and allow_empty is True:
+            if len(doc_ids) == 0 and allow_empty is True and "" in self.word_to_id:
                 doc_ids = [self.word_to_id[""]]
             
             yield doc_ids
