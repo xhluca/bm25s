@@ -409,6 +409,7 @@ class BM25:
     def index(
         self,
         corpus: Union[Iterable, Tuple, tokenization.Tokenized],
+        create_empty_token=True,
         show_progress=True,
         leave_progress=False,
     ):
@@ -427,6 +428,25 @@ class BM25:
         The `vocab_dict` dictionary is a mapping from tokens to their index in the vocabulary. This is used to
         create the sparse matrix representation of the BM25 scores, as well as during query time to convert the
         tokens to their indices.
+
+        Parameters
+        ----------
+        corpus : Iterable or Tuple or tokenization.Tokenized
+            The corpus of documents. This can be either:
+            - An iterable of documents, where each document is a list of tokens (strings).
+            - A tuple of two elements: the first is the list of unique token IDs (int), and the second is the vocabulary dictionary.
+            - An object with the `ids` and `vocab` attributes, which are the unique token IDs and the token IDs for each document, respectively.
+
+        create_empty_token : bool
+            If True, it will create an empty token, "",  in the vocabulary if it is not already present.
+            This is added at the end of the vocabulary and is used to score documents that do not contain any tokens.
+            If False, it will not create an empty token, which may lead to an error if a query does not contain any tokens.
+
+        show_progress : bool
+            If True, a progress bar will be shown. If False, no progress bar will be shown.
+
+        leave_progress : bool
+            If True, the progress bars will remain after the function completes.
         """
         inferred_corpus_obj = self._infer_corpus_object(corpus)
 
@@ -456,8 +476,19 @@ class BM25:
                 show_progress=show_progress,
             )
 
+        if create_empty_token:
+            if all(isinstance(token, int) for token in vocab_dict):
+                # if all tokens are integers, we don't need to add an empty token
+                pass
+            
+            if "" not in vocab_dict:
+                vocab_dict[""] = max(vocab_dict.values()) + 1
+
         self.scores = scores
         self.vocab_dict = vocab_dict
+
+        # we create unique token IDs from the vocab_dict for faster lookup
+        self.unique_token_ids_set = set(self.vocab_dict.values())
 
     def get_tokens_ids(self, query_tokens: List[str]) -> List[int]:
         """
@@ -481,7 +512,7 @@ class BM25:
         query_tokens_ids: np.ndarray = np.asarray(query_tokens_ids, dtype=int_dtype)
 
         max_token_id = int(query_tokens_ids.max(initial=0))
-        
+
         if max_token_id >= len(indptr) - 1:
             raise ValueError(
                 f"The maximum token ID in the query ({max_token_id}) is higher than the number of tokens in the index."
@@ -539,7 +570,7 @@ class BM25:
         This function is used to retrieve the top-k results for a single query.
         Since it's a hidden function, the user should not call it directly and
         may change in the future. Please use the `retrieve` function instead.
-        """     
+        """
         if len(query_tokens_single) == 0:
             logger.info(
                 msg="The query is empty. This will result in a zero score for all documents."
@@ -629,18 +660,18 @@ class BM25:
         weight_mask : np.ndarray
             A weight mask to filter the documents. If provided, the scores for the masked
             documents will be set to 0 to avoid returning them in the results.
-        
+
         Returns
         -------
         Results or np.ndarray
             If `return_as="tuple"`, a named tuple with two fields will be returned: `documents` and `scores`.
             If `return_as="documents"`, only the retrieved documents (or indices if `corpus` is not provided) will be returned.
-        
+
         Raises
         ------
         ValueError
             If the `query_tokens` is not a list of list of tokens (str) or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document.
-        
+
         ImportError
             If the numba backend is selected but numba is not installed.
         """
@@ -659,11 +690,19 @@ class BM25:
             query_tokens_filtered = []
             for query in query_tokens:
                 query_filtered = [
-                    token_id for token_id in query if token_id in self.vocab_dict
+                    token_id
+                    for token_id in query
+                    if token_id in self.unique_token_ids_set
                 ]
                 if len(query_filtered) == 0:
                     if "" not in self.vocab_dict:
-                        self.vocab_dict[""] = max(self.vocab_dict.values()) + 1
+                        raise ValueError(
+                            "The query does not contain any tokens that are in the vocabulary. "
+                            "Please provide a query that contains at least one token that is in the vocabulary. "
+                            "Alternatively, you can set `create_empty_token=True` when calling `index` to add an empty token to the vocabulary. "
+                            "You can also manually add an empty token to the vocabulary by setting `retriever.vocab_dict[''] = max(retriever.vocab_dict.values()) + 1`. "
+                            "Then, run `retriever.unique_token_ids_set = set(retriever.vocab_dict.values())` to update the unique token IDs."
+                        )
                     query_filtered = [self.vocab_dict[""]]
 
                 query_tokens_filtered.append(query_filtered)
@@ -876,9 +915,9 @@ class BM25:
         # Save the vocab dictionary
         vocab_path = save_dir / vocab_name
 
-        with open(vocab_path, "wt", encoding='utf-8') as f:
+        with open(vocab_path, "wt", encoding="utf-8") as f:
             f.write(json_functions.dumps(self.vocab_dict, ensure_ascii=False))
-            
+
         # Save the parameters
         params_path = save_dir / params_name
         params = dict(
@@ -899,7 +938,7 @@ class BM25:
         corpus = corpus if corpus is not None else self.corpus
 
         if corpus is not None:
-            with open(save_dir / corpus_name, "wt", encoding='utf-8') as f:
+            with open(save_dir / corpus_name, "wt", encoding="utf-8") as f:
                 # if it's not an iterable, we skip
                 if not isinstance(corpus, Iterable):
                     logging.warning(
@@ -1060,7 +1099,7 @@ class BM25:
         # Load the vocab dictionary
         if load_vocab:
             vocab_path = save_dir / vocab_name
-            with open(vocab_path, "r", encoding='utf-8') as f:
+            with open(vocab_path, "r", encoding="utf-8") as f:
                 vocab_dict: dict = json_functions.loads(f.read())
         else:
             vocab_dict = None
@@ -1091,7 +1130,7 @@ class BM25:
                     corpus = utils.corpus.JsonlCorpus(corpus_file)
                 else:
                     corpus = []
-                    with open(corpus_file, "r", encoding='utf-8') as f:
+                    with open(corpus_file, "r", encoding="utf-8") as f:
                         for line in f:
                             doc = json_functions.loads(line)
                             corpus.append(doc)

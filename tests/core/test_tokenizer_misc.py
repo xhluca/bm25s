@@ -58,13 +58,13 @@ class TestBM25SNewIds(unittest.TestCase):
         tokenizer = Tokenizer(
             stemmer=None, stopwords=None, splitter=lambda x: x.split()
         )
-        corpus_tokens = tokenizer.tokenize(corpus)
+        corpus_tokens = tokenizer.tokenize(corpus, allow_empty=False)
 
         bm25 = bm25s.BM25()
-        bm25.index(corpus_tokens)
+        bm25.index(corpus_tokens, create_empty_token=False)
 
         query = "What is a fly?"
-        query_tokens = tokenizer.tokenize([query], update_vocab=True)
+        query_tokens = tokenizer.tokenize([query], update_vocab=True, allow_empty=False)
         self.assertListEqual([[27, 2, 0, 28]], query_tokens)
 
         results, scores = bm25.retrieve(query_tokens, k=3)
@@ -84,13 +84,13 @@ class TestBM25SNewIds(unittest.TestCase):
         tokenizer = Tokenizer(
             stemmer=None, stopwords=None, splitter=lambda x: x.split()
         )
-        corpus_tokens = tokenizer.tokenize(corpus, return_as="tuple")
+        corpus_tokens = tokenizer.tokenize(corpus, return_as="tuple", allow_empty=False)
 
         bm25 = bm25s.BM25()
-        bm25.index(corpus_tokens)
+        bm25.index(corpus_tokens, create_empty_token=False)
 
         query = "unknownword"
-        query_tokens = tokenizer.tokenize([query], update_vocab=True)
+        query_tokens = tokenizer.tokenize([query], update_vocab=True, allow_empty=False)
 
         # assert a valueError is raised
         with self.assertRaises(ValueError):
