@@ -123,7 +123,6 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         self.assertEqual(json_functions.loads, json.loads)
         self.test_b_load()
 
-
     @classmethod
     def tearDownClass(cls):
         # remove the temp dir with rmtree
@@ -172,3 +171,61 @@ class TestBM25SNonASCIILoadingSaving(unittest.TestCase):
     def tearDownClass(cls):
         # remove the temp dir with rmtree
         shutil.rmtree(cls.tmpdirname)
+
+
+class TestSaveAndReloadWithTokenizer(unittest.TestCase):
+    def setUp(self):
+        self.tmpdirname = tempfile.mkdtemp()
+    
+    def tearDown(self):
+        shutil.rmtree(self.tmpdirname)
+    
+    def test_save_and_reload_with_tokenizer(self):
+        import bm25s
+        from bm25s.tokenization import Tokenizer
+
+        corpus = [
+            "Welcome to bm25s, a library that implements BM25 in Python, allowing you to rank documents based on a query.",
+            "BM25 is a widely used ranking function used for text retrieval tasks, and is a core component of search services like Elasticsearch.",
+            "It is designed to be:",
+            "Fast: bm25s is implemented in pure Python and leverage Scipy sparse matrices to store eagerly computed scores for all document tokens.",
+            "This allows extremely fast scoring at query time, improving performance over popular libraries by orders of magnitude (see benchmarks below).",
+            "Simple: bm25s is designed to be easy to use and understand.",
+            "You can install it with pip and start using it in minutes.",
+            "There is no dependencies on Java or Pytorch - all you need is Scipy and Numpy, and optional lightweight dependencies for stemming.",
+            "Below, we compare bm25s with Elasticsearch in terms of speedup over rank-bm25, the most popular Python implementation of BM25.",
+            "We measure the throughput in queries per second (QPS) on a few popular datasets from BEIR in a single-threaded setting.",
+            "bm25s aims to offer a faster alternative for Python users who need efficient text retrieval.",
+            "It leverages modern Python libraries and data structures for performance optimization.",
+            "You can find more details in the documentation and example notebooks provided.",
+            "Installation and usage guidelines are simple and accessible for developers of all skill levels.",
+            "Try bm25s for a scalable and fast text ranking solution in your Python projects."
+        ]
+
+        # print(f"We have {len(corpus)} documents in the corpus.")
+
+        tokenizer = Tokenizer(stemmer=None, stopwords=None, splitter=lambda x: x.split())
+        corpus_tokens = tokenizer.tokenize(corpus, return_as='tuple')
+
+        retriever = bm25s.BM25(corpus=corpus)
+        retriever.index(corpus_tokens)
+
+        index_path = os.path.join(self.tmpdirname, "bm25s_index_readme")
+
+        retriever.save(index_path)
+        tokenizer.save_vocab(save_dir=index_path)
+
+        reloaded_retriever = bm25s.BM25.load(index_path, load_corpus=True)
+        reloaded_tokenizer = Tokenizer(stemmer=None, stopwords=None, splitter=lambda x: x.split())
+        reloaded_tokenizer.load_vocab(index_path)
+
+        queries = ["widely used text ranking function"]
+
+        query_tokens = reloaded_tokenizer.tokenize(queries, update_vocab=False)
+        results, scores = reloaded_retriever.retrieve(query_tokens, k=2)
+
+        doc = results[0,0]
+        score = scores[0,0]
+
+        assert doc['id'] == 1
+        assert score > 3 and score < 4

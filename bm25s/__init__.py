@@ -687,6 +687,11 @@ class BM25:
 
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
         if is_list_of_list_of_type(query_tokens, type_=int):
+            if not hasattr(self, "unique_token_ids_set") or self.unique_token_ids_set is None:
+                raise ValueError(
+                    "The unique_token_ids_set attribute is not found. Please run the `index` method first, or make sure"
+                    "run retriever.load(load_vocab=True) before calling retrieve on list of list of token IDs (int)."
+                )
             query_tokens_filtered = []
             for query in query_tokens:
                 query_filtered = [
@@ -1110,6 +1115,7 @@ class BM25:
         bm25_obj = cls(**params)
         bm25_obj.vocab_dict = vocab_dict
         bm25_obj._original_version = original_version
+        bm25_obj.unique_token_ids_set = set(bm25_obj.vocab_dict.values())
 
         bm25_obj.load_scores(
             save_dir=save_dir,
