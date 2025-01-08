@@ -154,6 +154,7 @@ query_token_strs = bm25s.tokenize(queries, return_ids=False)
 titles = ["About Cat", "About Dog", "About Bird", "About Fish"]
 
 # You can also choose to only return the documents and omit the scores
+# note: if you pass a new corpus here, it must have the same length as your indexed corpus
 results = retriever.retrieve(query_token_ids, corpus=titles, k=2, return_as="documents")
 
 # The documents are returned as a numpy array of shape (n_queries, k)
