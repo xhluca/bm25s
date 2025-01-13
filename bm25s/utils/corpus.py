@@ -27,7 +27,8 @@ def change_extension(path, new_extension):
 def find_newline_positions(path, show_progress=True, leave_progress=True):
     path = str(path)
     indexes = []
-    with open(path, "r") as f:
+    # With UTF-8 encoding, we can solve problems in other languages. It would probably be good to update all open() calls.
+    with open(path, "r", encoding='utf-8') as f:
         indexes.append(f.tell())
         pbar = tqdm(
             total=os.path.getsize(path),
