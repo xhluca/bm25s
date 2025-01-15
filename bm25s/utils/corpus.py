@@ -24,11 +24,10 @@ def change_extension(path, new_extension):
     return path.rpartition(".")[0] + new_extension
 
 
-def find_newline_positions(path, show_progress=True, leave_progress=True):
+def find_newline_positions(path, show_progress=True, leave_progress=True, encoding="utf-8"):
     path = str(path)
     indexes = []
-    # With UTF-8 encoding, we can solve problems in other languages. It would probably be good to update all open() calls.
-    with open(path, "r", encoding='utf-8') as f:
+    with open(path, "r", encoding=encoding) as f:
         indexes.append(f.tell())
         pbar = tqdm(
             total=os.path.getsize(path),
@@ -52,17 +51,17 @@ def find_newline_positions(path, show_progress=True, leave_progress=True):
     return indexes[:-1]
 
 
-def save_mmindex(indexes, path):
+def save_mmindex(indexes, path, encoding="utf-8"):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
-    with open(index_file, "w") as f:
+    with open(index_file, "w", encoding=encoding) as f:
         f.write(json_functions.dumps(indexes))
 
 
-def load_mmindex(path):
+def load_mmindex(path, encoding="utf-8"):
     path = str(path)
     index_file = change_extension(path, ".mmindex.json")
-    with open(index_file, "r") as f:
+    with open(index_file, "r", encoding=encoding) as f:
         return json_functions.loads(f.read())
 
 
@@ -77,7 +76,7 @@ def get_line(
 ) -> str:
     path = str(path)
     if file_obj is None:
-        file_obj = open(path, "r")
+        file_obj = open(path, "r", encoding=encoding)
         CLOSE_FILE = True
     else:
         CLOSE_FILE = False
@@ -122,26 +121,26 @@ class JsonlCorpus:
     ```python
     corpus = JsonlCorpus("file.jsonl")
     print(corpus[1000])
-
     ```
 
     Which only loads the line you need into memory, and is much faster.
     """
 
-    def __init__(self, path, show_progress=True, leave_progress=True, save_index=True, verbosity=1):
+    def __init__(self, path, show_progress=True, leave_progress=True, save_index=True, verbosity=1, encoding='utf-8'):
         self.path = path
         self.verbosity = verbosity
+        self.encoding = encoding
 
         # if the index file does not exist, create it
         if os.path.exists(change_extension(path, ".mmindex.json")):
-            self.mmindex = load_mmindex(path)
+            self.mmindex = load_mmindex(path, encoding=self.encoding)
         else:
             logging.info("Creating index file for jsonl corpus")
             mmindex = find_newline_positions(
-                path, show_progress=show_progress, leave_progress=leave_progress
+                path, show_progress=show_progress, leave_progress=leave_progress, encoding=self.encoding
             )
             if save_index:
-                save_mmindex(mmindex, path)
+                save_mmindex(mmindex, path, encoding=self.encoding)
 
             self.mmindex = mmindex
 
@@ -159,6 +158,7 @@ class JsonlCorpus:
                     self.path,
                     index,
                     self.mmindex,
+                    encoding=self.encoding,
                     file_obj=self.file_obj,
                     mmap_obj=self.mmap_obj,
                 )
@@ -208,7 +208,7 @@ class JsonlCorpus:
         """
         self.close()  # close any existing file and mmap objects
 
-        self.file_obj = open(self.path, "r")
+        self.file_obj = open(self.path, "r", encoding=self.encoding)
         self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
         if self.verbosity >= 1:
             logging.info("Opened file and mmap objects")
