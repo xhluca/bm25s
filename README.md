@@ -24,6 +24,13 @@
       </tr>
 </table>
 
+<a href="https://pepy.tech/projects/bm25s"><img src="https://static.pepy.tech/badge/bm25s" alt="PyPI Downloads"></a>
+<a href="https://pypi.org/project/bm25s/"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/bm25s"></a>
+<img alt="GitHub License" src="https://img.shields.io/github/license/xhluca/bm25s?link=https%3A%2F%2Fgithub.com%2Fxhluca%2Fbm25s%2Fblob%2Fmain%2FLICENSE">
+<a href="https://github.com/xhluca/bm25s/pulls?q=is%3Apr+is%3Aclosed"><img alt="GitHub Issues or Pull Requests" src="https://img.shields.io/github/issues-pr-closed/xhluca/bm25s"></a>
+<img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/xhluca/bm25s?link=https%3A%2F%2Fgithub.com%2Fxhluca%2Fbm25s%2Fdiscussions">
+
+
 </div>
 
 Welcome to `bm25s`, a library that implements BM25 in Python, allowing you to rank documents based on a query. BM25 is a widely used ranking function used for text retrieval tasks, and is a core component of search services like Elasticsearch.
