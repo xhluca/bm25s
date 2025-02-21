@@ -10,6 +10,14 @@ try:
 except ImportError:
     pass
 
+TORCH_IS_AVAILABLE = False  # Set to True if you want to test the PyTorch backend
+try:
+    import torch
+    TORCH_IS_AVAILABLE = True
+except ImportError:
+    pass
+
+
 from bm25s.selection import topk
 
 
@@ -49,6 +57,16 @@ class TestTopKSingleQuery(unittest.TestCase):
         result_scores, result_indices = topk(jnp.array(self.scores), self.k, backend="jax", sorted=False)
         self.check_results(result_scores, result_indices, sorted=True)
 
+    @unittest.skipUnless(TORCH_IS_AVAILABLE, "PyTorch is not available")
+    def test_topk_torch_sorted(self):
+        result_scores, result_indices = topk(torch.tensor(self.scores), self.k, backend="torch", sorted=True)
+        self.check_results(result_scores, result_indices, sorted=True)
+
+    @unittest.skipUnless(TORCH_IS_AVAILABLE, "PyTorch is not available")
+    def test_topk_torch_unsorted(self):
+        result_scores, result_indices = topk(torch.tensor(self.scores), self.k, backend="torch", sorted=False)
+        self.check_results(result_scores, result_indices, sorted=False)
+
     def test_topk_auto_backend(self):
         result_scores, result_indices = topk(self.scores, self.k, backend="auto", sorted=True)
         self.check_results(result_scores, result_indices, sorted=True)
@@ -62,6 +80,17 @@ class TestTopKSingleQuery(unittest.TestCase):
         self.check_results(result_scores, result_indices, sorted=True)
         
         JAX_IS_AVAILABLE = original_jax_is_available  # Restore the original value
+
+    def test_torch_installed_but_unavailable(self):
+        global TORCH_IS_AVAILABLE
+        original_torch_is_available = TORCH_IS_AVAILABLE
+        TORCH_IS_AVAILABLE = False
+
+        result_scores, result_indices = topk(self.scores, self.k, backend="auto", sorted=True)
+        self.check_results(result_scores, result_indices, sorted=True)
+
+        TORCH_IS_AVAILABLE = original_torch_is_available
+
 
 if __name__ == '__main__':
     unittest.main()

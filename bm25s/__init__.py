@@ -654,8 +654,8 @@ class BM25:
             Number of batches to process in each job in the multiprocessing pool.
 
         backend_selection : str
-            The backend to use for the top-k retrieval. Choose from "auto", "numpy", "jax".
-            If "auto", it will use JAX if it is available, otherwise it will use numpy.
+            The backend to use for the top-k retrieval. Choose from "auto", "numpy", "jax", "torch".
+            If "auto", it will use JAX or pytorch if it is available, otherwise it will use numpy.
 
         weight_mask : np.ndarray
             A weight mask to filter the documents. If provided, the scores for the masked

@@ -10,6 +10,13 @@ else:
     # any output to avoid it from saying that gpu is not available
     _ = jax.lax.top_k(np.array([0] * 5), 1)
 
+try:
+    import torch
+except ImportError:
+    TORCH_IS_AVAILABLE = False
+else:
+    TORCH_IS_AVAILABLE = True
+
 
 def _topk_numpy(query_scores, k, sorted):
     # https://stackoverflow.com/questions/65038206/how-to-get-indices-of-top-k-values-from-a-numpy-array
@@ -45,6 +52,14 @@ def _topk_jax(query_scores, k):
     return topk_scores, topk_indices
 
 
+def _topk_torch(query_scores, k):
+    topk_scores, topk_indices = torch.topk(torch.tensor(query_scores), k)
+    topk_scores = topk_scores.cpu().numpy()
+    topk_indices = topk_indices.cpu().numpy()
+
+    return topk_scores, topk_indices
+
+
 def topk(query_scores, k, backend="auto", sorted=True):
     """
     This function is used to retrieve the top-k results for a single query. It will only work
@@ -52,13 +67,21 @@ def topk(query_scores, k, backend="auto", sorted=True):
     """
     if backend == "auto":
         # if jax.lax is available, use it to speed up selection, otherwise use numpy
-        backend = "jax" if JAX_IS_AVAILABLE else "numpy"
-    
-    if backend not in ["numpy", "jax"]:
-        raise ValueError("Invalid backend. Please choose from 'numpy' or 'jax'.")
+        if JAX_IS_AVAILABLE:
+            backend = "jax"
+        elif TORCH_IS_AVAILABLE:
+            backend = "torch"
+        else:
+            backend = "numpy"
+    if backend not in ["numpy", "jax", "torch"]:
+        raise ValueError("Invalid backend. Please choose from 'numpy', 'torch' or 'jax'.")
     elif backend == "jax":
         if not JAX_IS_AVAILABLE:
             raise ImportError("JAX is not available. Please install JAX with `pip install jax[cpu]` to use this backend.")
         return _topk_jax(query_scores, k)
+    elif backend == "torch":
+        if not TORCH_IS_AVAILABLE:
+            raise ImportError("PyTorch is not available. Please install PyTorch with `pip install torch` to use this backend.")
+        return _topk_torch(query_scores, k)
     else:
         return _topk_numpy(query_scores, k, sorted)

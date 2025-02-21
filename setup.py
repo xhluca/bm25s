@@ -14,6 +14,7 @@ extras_require = {
     "hf": ["huggingface_hub"],
     "dev": ["black"],
     "selection": ["jax[cpu]"],
+    "pytorch-selection": ["torch"],
     "evaluation": ["pytrec_eval"],
 }
 # Dynamically create the 'full' extra by combining all other extras
