@@ -1107,7 +1107,7 @@ class BM25:
             with open(vocab_path, "r", encoding="utf-8") as f:
                 vocab_dict: dict = json_functions.loads(f.read())
         else:
-            vocab_dict = None
+            vocab_dict = {}
 
         original_version = params.pop("version", None)
         num_docs = params.pop("num_docs", None)
