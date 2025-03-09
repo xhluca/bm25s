@@ -63,5 +63,21 @@ class TestTopKSingleQuery(unittest.TestCase):
         
         JAX_IS_AVAILABLE = original_jax_is_available  # Restore the original value
 
+    def test_top_k_with_very_small_corpus(self):
+        # suppose corpus is very small hence the small query_scores
+        query_scores = np.array([0.5, 0.2])
+        # suppose k > len(query_scores)
+        k = 10
+        with self.assertRaises(ValueError) as context:
+            topk(query_scores, k)
+        exception_str_should_include = "Please set with a smaller k or increase the size of corpus."
+        self.assertIn(
+            exception_str_should_include,
+            str(context.exception),
+            f"Expected ValueError mentioning (but did not)"
+            f"; {exception_str_should_include}"
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
