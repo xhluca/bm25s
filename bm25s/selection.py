@@ -50,12 +50,6 @@ def topk(query_scores, k, backend="auto", sorted=True):
     This function is used to retrieve the top-k results for a single query. It will only work
     on a 1-dimensional array of scores.
     """
-    if k > len(query_scores):
-        raise ValueError(
-            f"k of {k} is larger than the number of available scores"
-            f", which is {len(query_scores)} (corpus size should be larger than top-k)."
-            f" Please set with a smaller k or increase the size of corpus."
-        )
     if backend == "auto":
         # if jax.lax is available, use it to speed up selection, otherwise use numpy
         backend = "jax" if JAX_IS_AVAILABLE else "numpy"

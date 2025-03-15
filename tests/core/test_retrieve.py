@@ -126,9 +126,37 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.retriever.retrieve(query_tokens_tuple, k=2)
 
-        
-
-
+    def test_value_error_for_very_small_corpus(self):
+        query = "a cat is a feline, it's sometimes beautiful but cannot fly"
+        query_tokens = bm25s.tokenize(
+            [query], stopwords="en",
+            stemmer=self.stemmer, return_ids=True
+        )
+        corpus_size = len(self.corpus)
+        for k in range(0, 10):
+            if k > corpus_size:
+                with self.assertRaises(ValueError) as context:
+                    self.retriever.retrieve(query_tokens, k=k)
+                exception_str_should_include =\
+                    "Please set with a smaller k or increase the size of corpus."
+                self.assertIn(
+                    exception_str_should_include,
+                    str(context.exception),
+                    f"[k={k}] Expected ValueError mentioning (but did not)"
+                    f"; {exception_str_should_include}"
+                )
+            else:
+                results, scores = self.retriever.retrieve(query_tokens, k=k)
+                self.assertEqual(
+                    int(results.size), k,
+                    f"[k={k}] The number of searched items"
+                    f" should be {k}; but it was {results.size}"
+                )
+                self.assertEqual(
+                    int(scores.size), k,
+                    f"[k={k}] The number of searched items"
+                    f" should be {k}; but it was {scores.size}"
+                )
 
     @classmethod
     def tearDownClass(cls):
