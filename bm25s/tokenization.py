@@ -516,7 +516,7 @@ def tokenize(
         Whether to convert the text to lowercase before tokenization
 
     token_pattern : str, optional
-        The regex pattern to use for tokenization, by default r"(?u)\b\w\w+\b"
+        The regex pattern to use for tokenization. r"(?u)\\b\\w\\w+\\b"
 
     stopwords : Union[str, List[str]], optional
         The list of stopwords to remove from the text. If "english" or "en" is provided,
