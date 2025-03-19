@@ -40,6 +40,121 @@ class Tokenized(NamedTuple):
     ids: List[List[int]]
     vocab: Dict[str, int]
 
+    def __repr__(self):
+        """
+        Returns:
+            a string representation of the class.
+            for example, for a small corpus, it would be something like:
+            ----
+            Tokenized(
+              "ids": [
+                0: [0, 1, 2, 3]
+              ],
+              "vocab": [
+                '': 4
+                'cat': 0
+                'feline': 1
+                'likes': 2
+                'purr': 3
+              ],
+            )
+            ----
+
+            and, for example, for a large corpus, it would be something like:
+            ----
+            Tokenized(
+              "ids": [
+                0: [0, 1, 2, 3]
+                1: [4, 5, 6, 7, 8, 9]
+                2: [10, 11, 12, 13, 14]
+                3: [15, 16, 17, 18, 19]
+                4: [0, 1, 2, 3, 0, 20, 21, 22, 23, 24, ...]
+                5: [0, 1, 2, 3]
+                6: [4, 5, 6, 7, 8, 9]
+                7: [10, 11, 12, 13, 14]
+                8: [15, 16, 17, 18, 19]
+                9: [0, 1, 2, 3, 0, 20, 21, 22, 23, 24, ...]
+                ... (total 500000 docs)
+              ],
+              "vocab": [
+                '': 29
+                'animal': 12
+                'beautiful': 11
+                'best': 6
+                'bird': 10
+                'can': 13
+                'carefully': 27
+                'casually': 28
+                'cat': 0
+                'creature': 16
+                ... (total 30 tokens)
+              ],
+            )
+            ----
+        """
+        lines_print_max_num = 10
+        single_doc_print_max_len = 10
+        lines = ["Tokenized(", '  "ids": [']
+        for doc_idx, document in enumerate(self.ids[:lines_print_max_num]):
+            preview = document[:single_doc_print_max_len]
+            if len(document) > single_doc_print_max_len:
+                preview += ["..."]
+            lines.append(f"    {doc_idx}: [{', '.join([str(x) for x in preview])}]")
+        if len(self.ids) > lines_print_max_num:
+            lines.append(f"    ... (total {len(self.ids)} docs)")
+        lines.append(f'  ],\n  "vocab": [')
+        vocab_keys = sorted(list(self.vocab.keys()))
+        for vocab_idx, key_ in enumerate(vocab_keys[:lines_print_max_num]):
+            val_ = self.vocab[key_]
+            lines.append(f"    {key_!r}: {val_}")
+        if len(list(vocab_keys)) > 10:
+            lines.append(f"    ... (total {len(vocab_keys)} tokens)")
+        lines.append("  ],\n)")
+        return "\n".join(lines)
+
+
+class CorpusIDsList(list):
+    def __repr__(self):
+        """
+        Returns:
+            a string representation of the class.
+            for example, for a small corpus, it would be something like:
+            ----
+            CorpusIDsList(
+              0: [cat, feline, likes, purr]
+            )
+            ----
+
+            and, for example, for a large corpus, it would be something like:
+            ----
+            CorpusIDsList(
+              0: [cat, feline, likes, purr]
+              1: [dog, human, best, friend, loves, play]
+              2: [bird, beautiful, animal, can, fly]
+              3: [fish, creature, lives, water, swims]
+              4: [cat, feline, likes, purr, cat, may, like, jump, very, high, ...]
+              5: [cat, feline, likes, purr]
+              6: [dog, human, best, friend, loves, play]
+              7: [bird, beautiful, animal, can, fly]
+              8: [fish, creature, lives, water, swims]
+              9: [cat, feline, likes, purr, cat, may, like, jump, very, high, ...]
+              ... (total 500000 docs)
+            )
+            ----
+        """
+        lines_print_max_num = 10
+        single_doc_print_max_len = 10
+        lines = ["CorpusIDsList("]
+        for doc_idx, document in enumerate(self[:lines_print_max_num]):
+            preview = document[:single_doc_print_max_len]
+            if len(document) > single_doc_print_max_len:
+                preview = preview + ["..."]
+            lines.append(f"  {doc_idx}: [{', '.join([str(x) for x in preview])}]")
+        if len(self) > lines_print_max_num:
+            lines.append(f"  ... (total {len(self)} docs)")
+        lines.append(")")
+        return "\n".join(lines)
+
 
 class Tokenizer:
     """
@@ -620,7 +735,6 @@ def tokenize(
     # Step 3: Return the tokenized IDs and the vocab dictionary or the tokenized strings
     if return_ids:
         return Tokenized(ids=corpus_ids, vocab=vocab_dict)
-
     else:
         # We need a reverse dictionary to convert the token IDs back to tokens
         reverse_dict = stem_id_to_stem if stemmer is not None else unique_tokens
@@ -634,5 +748,4 @@ def tokenize(
             )
         ):
             corpus_ids[i] = [reverse_dict[token_id] for token_id in token_ids]
-
-        return corpus_ids
+        return CorpusIDsList(corpus_ids)
