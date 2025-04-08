@@ -797,6 +797,7 @@ class BM25:
                 dtype=self.dtype,
                 int_dtype=self.int_dtype,
                 nonoccurrence_array=self.nonoccurrence_array,
+                weight_mask=weight_mask,
             )
 
             if return_as == "tuple":
