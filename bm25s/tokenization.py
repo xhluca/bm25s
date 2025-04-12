@@ -113,49 +113,6 @@ class Tokenized(NamedTuple):
         return "\n".join(lines)
 
 
-class CorpusIDsList(list):
-    def __repr__(self):
-        """
-        Returns:
-            a string representation of the class.
-            for example, for a small corpus, it would be something like:
-            ----
-            CorpusIDsList(
-              0: [cat, feline, likes, purr]
-            )
-            ----
-
-            and, for example, for a large corpus, it would be something like:
-            ----
-            CorpusIDsList(
-              0: [cat, feline, likes, purr]
-              1: [dog, human, best, friend, loves, play]
-              2: [bird, beautiful, animal, can, fly]
-              3: [fish, creature, lives, water, swims]
-              4: [cat, feline, likes, purr, cat, may, like, jump, very, high, ...]
-              5: [cat, feline, likes, purr]
-              6: [dog, human, best, friend, loves, play]
-              7: [bird, beautiful, animal, can, fly]
-              8: [fish, creature, lives, water, swims]
-              9: [cat, feline, likes, purr, cat, may, like, jump, very, high, ...]
-              ... (total 500000 docs)
-            )
-            ----
-        """
-        lines_print_max_num = 10
-        single_doc_print_max_len = 10
-        lines = ["CorpusIDsList("]
-        for doc_idx, document in enumerate(self[:lines_print_max_num]):
-            preview = document[:single_doc_print_max_len]
-            if len(document) > single_doc_print_max_len:
-                preview = preview + ["..."]
-            lines.append(f"  {doc_idx}: [{', '.join([str(x) for x in preview])}]")
-        if len(self) > lines_print_max_num:
-            lines.append(f"  ... (total {len(self)} docs)")
-        lines.append(")")
-        return "\n".join(lines)
-
-
 class Tokenizer:
     """
     Tokenizer class for tokenizing a list of strings and converting them to token IDs.
@@ -748,4 +705,4 @@ def tokenize(
             )
         ):
             corpus_ids[i] = [reverse_dict[token_id] for token_id in token_ids]
-        return CorpusIDsList(corpus_ids)
+        return corpus_ids

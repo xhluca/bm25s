@@ -156,32 +156,16 @@ class TestBM25SNewIds(unittest.TestCase):
             corpus += small_unit
         tokenized = bm25s.tokenize(corpus, stopwords="en", return_ids=True)
         repr_tokenized = repr(tokenized)
-        self.assertEqual(repr_tokenized, str(tokenized))
         self.assertIn("... (total", repr_tokenized,
                       msg="it should include the '...' message, for the indication of the truncation.")
         self.assertIn(", ...]", repr_tokenized,
                       msg="it should include the '...' message, for the indication of the truncation.")
-        corpus_ids = bm25s.tokenize(corpus, stopwords="en", return_ids=False)
-        repr_corpus_ids = repr(corpus_ids)
-        self.assertEqual(repr_corpus_ids, str(repr_corpus_ids))
-        self.assertIn("... (total", repr_corpus_ids,
-                      msg="it should include the '...' message within the token id list, for the same reason.")
-        self.assertIn(", ...]", repr_corpus_ids,
-                      msg="it should include the '...' message within the token id list, for the same reason.")
 
     def test_truncation_of_small_corpus(self):
         corpus = ["a cat is a feline"]
         tokenized = bm25s.tokenize(corpus, stopwords="en", return_ids=True)
         repr_tokenized = repr(tokenized)
-        self.assertEqual(repr_tokenized, str(tokenized))
         self.assertNotIn("... (total", repr_tokenized,
                          msg="it should not include the '...' message when the corpus is small")
         self.assertNotIn(", ...]", repr_tokenized,
-                         msg="it should not include the '...' message when the doc is short")
-        corpus_ids = bm25s.tokenize(corpus, stopwords="en", return_ids=False)
-        repr_corpus_ids = repr(corpus_ids)
-        self.assertEqual(repr_corpus_ids, str(repr_corpus_ids))
-        self.assertNotIn("... (total", repr_corpus_ids,
-                         msg="it should not include the '...' message when the corpus is small")
-        self.assertNotIn(", ...]", repr_corpus_ids,
                          msg="it should not include the '...' message when the doc is short")
