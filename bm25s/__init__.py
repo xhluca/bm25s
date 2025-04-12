@@ -675,6 +675,13 @@ class BM25:
         ImportError
             If the numba backend is selected but numba is not installed.
         """
+        num_docs = self.scores["num_docs"]
+        if k > num_docs:
+            raise ValueError(
+                f"k of {k} is larger than the number of available scores"
+                f", which is {num_docs} (corpus size should be larger than top-k)."
+                f" Please set with a smaller k or increase the size of corpus."
+            )
         allowed_return_as = ["tuple", "documents"]
 
         if return_as not in allowed_return_as:
@@ -790,6 +797,7 @@ class BM25:
                 dtype=self.dtype,
                 int_dtype=self.int_dtype,
                 nonoccurrence_array=self.nonoccurrence_array,
+                weight_mask=weight_mask,
             )
 
             if return_as == "tuple":
