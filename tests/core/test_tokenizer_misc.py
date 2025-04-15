@@ -141,3 +141,31 @@ class TestBM25SNewIds(unittest.TestCase):
 
         results, scores = bm25.retrieve(query_tokens, k=3)
         self.assertTrue(np.all(scores == 0.0))
+
+    def test_truncation_of_large_corpus(self):
+        small_unit = [
+            "a cat is a feline and likes to purr",
+            "a dog is the human's best friend and loves to play",
+            "a bird is a beautiful animal that can fly",
+            "a fish is a creature that lives in water and swims",
+            # a line more than 10 tokens
+            "a cat is a feline and likes to purr and the cat can jump very high with so careful but casual manner",
+        ]
+        corpus = []
+        for i in range(1000):
+            corpus += small_unit
+        tokenized = bm25s.tokenize(corpus, stopwords="en", return_ids=True)
+        repr_tokenized = repr(tokenized)
+        self.assertIn("... (total", repr_tokenized,
+                      msg="it should include the '...' message, for the indication of the truncation.")
+        self.assertIn(", ...]", repr_tokenized,
+                      msg="it should include the '...' message, for the indication of the truncation.")
+
+    def test_truncation_of_small_corpus(self):
+        corpus = ["a cat is a feline"]
+        tokenized = bm25s.tokenize(corpus, stopwords="en", return_ids=True)
+        repr_tokenized = repr(tokenized)
+        self.assertNotIn("... (total", repr_tokenized,
+                         msg="it should not include the '...' message when the corpus is small")
+        self.assertNotIn(", ...]", repr_tokenized,
+                         msg="it should not include the '...' message when the doc is short")
