@@ -214,7 +214,10 @@ class BM25:
                     "Corpus must be a list of list of tokens, an object with the `ids` and `vocab` attributes, or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
                 )
         elif isinstance(corpus, Iterable):
-            return "tokens"
+            if is_list_of_list_of_type(corpus, type_=int):
+                return "token_ids"
+            else:
+                return "tokens"
         else:
             raise ValueError(
                 "Corpus must be a list of list of tokens, an object with the `ids` and `vocab` attributes, or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
@@ -463,6 +466,23 @@ class BM25:
                 logger.debug(msg="Building index from IDs objects")
                 corpus_token_ids = corpus.ids
                 vocab_dict = corpus.vocab
+            elif inferred_corpus_obj == "token_ids":
+                # we need to create a vocab_dict from the unique token IDs
+                logger.debug(msg="Building index from token IDs")
+                corpus_token_ids = corpus
+                unique_ids = set()
+                for doc_ids in corpus_token_ids:
+                    unique_ids.update(doc_ids)
+                # if there's allowed empty token, we need to add it to the vocab_dict to either 0 or max+1
+                if create_empty_token:
+                    if 0 not in unique_ids:
+                        unique_ids.add(0)
+                    else:
+                        unique_ids.add(max(unique_ids) + 1)
+                
+                # create the vocab_dict from the unique token IDs
+                vocab_dict = {token_id: i for i, token_id in enumerate(unique_ids)}
+                
             else:
                 raise ValueError(
                     "Internal error: Found an invalid corpus object, indicating `_inferred_corpus_object` is not working correctly."
@@ -477,11 +497,7 @@ class BM25:
             )
 
         if create_empty_token:
-            if all(isinstance(token, int) for token in vocab_dict):
-                # if all tokens are integers, we don't need to add an empty token
-                pass
-            
-            if "" not in vocab_dict:
+            if inferred_corpus_obj != "token_ids" and "" not in vocab_dict:
                 vocab_dict[""] = max(vocab_dict.values()) + 1
 
         self.scores = scores
