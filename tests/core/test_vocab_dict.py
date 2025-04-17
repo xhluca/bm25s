@@ -61,10 +61,17 @@ class TestVocabDict(unittest.TestCase):
         new_docs = ["cat", "", "potato"]
 
         tokenizer = bm25s.tokenization.Tokenizer(stopwords="en", stemmer=stemmer)
-        corpus_tokens = tokenizer.tokenize(corpus)
-        new_docs_tokens = tokenizer.tokenize(new_docs)
+        corpus_tokens = tokenizer.tokenize(corpus, return_as='ids', allow_empty=True)
+        new_docs_tokens = tokenizer.tokenize(new_docs, return_as='ids', allow_empty=True)
 
+        # create_empty_token=True
         retriever = bm25s.BM25(method='bm25+')
-        retriever.index(corpus_tokens, create_empty_token=False)
-
+        retriever.index(corpus_tokens, create_empty_token=True)
         retriever.retrieve(new_docs_tokens, k=1)
+
+        # create_empty_token=False
+        retriever = bm25s.BM25(method='bm25+')
+        # assert that this will throw an error
+        with self.assertRaises(IndexError):
+            retriever.index(corpus_tokens, create_empty_token=False)
+            retriever.retrieve(new_docs_tokens, k=1)

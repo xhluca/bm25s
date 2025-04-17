@@ -67,6 +67,33 @@ class TestBM25SLoadingSaving(unittest.TestCase):
         results = self.retriever.retrieve(queries_as_tuple, k=1).documents
         self.assertTrue(np.array_equal(ground_truth, results), f"Expected {ground_truth}, got {results}")
 
+    def test_retrieve_with_different_return_types(self):
+        queries = [
+            "a cat is a feline, it's sometimes beautiful but cannot fly",
+            "a dog is the human's best friend and loves to play"
+        ]
+        for method in ['bm25+', 'lucene', 'bm25l', 'atire', 'robertson']:
+            all_docs = []
+            all_scores = []
+            for return_type in ['ids', 'tuple', 'string']:
+                tokenizer = bm25s.tokenization.Tokenizer(lower=True,stopwords="en", stemmer=self.stemmer)
+                corpus_tokens = tokenizer.tokenize(self.corpus, return_as=return_type, show_progress=False, allow_empty=True)
+                query_tokens = tokenizer.tokenize(queries, return_as=return_type, show_progress=False, allow_empty=True)
+                # Create the BM25 model and index the corpus
+                retriever = bm25s.BM25(method=method)
+                retriever.index(corpus_tokens)
+
+                docs, scores = retriever.retrieve(query_tokens, k=2, sorted=False)
+                all_docs.append(docs)
+                all_scores.append(scores)
+            
+            # Check if the results are the same for both return types
+            for doc in all_docs[1:]:
+                self.assertTrue(np.array_equal(all_docs[0], doc), f"Expected {all_docs[0]}, got {doc}")
+            # Check if the scores are the same for both return types
+            for score in all_scores[1:]:
+                self.assertTrue(np.array_equal(all_scores[0], score), f"Expected {all_scores[0]}, got {score}")
+
 
     def test_retrieve_with_weight_mask(self):
         
