@@ -53,7 +53,8 @@ def _build_idf_array(
     idf_array = np.zeros(n_vocab, dtype=dtype)
 
     for token_id, df in doc_frequencies.items():
-        idf_array[token_id] = compute_idf_fn(df, N=n_docs)
+        if df != 0:
+            idf_array[token_id] = compute_idf_fn(df, N=n_docs)
 
     return idf_array
 
@@ -87,11 +88,12 @@ def _build_nonoccurrence_array(
     nonoccurrence_array = np.zeros(n_vocab, dtype=dtype)
 
     for token_id, df in doc_frequencies.items():
-        idf = compute_idf_fn(df, N=n_docs)
-        tfc = calculate_tfc_fn(
-            tf_array=0, l_d=l_d, l_avg=l_avg, k1=k1, b=b, delta=delta
-        )
-        nonoccurrence_array[token_id] = idf * tfc
+        if df != 0:
+            idf = compute_idf_fn(df, N=n_docs)
+            tfc = calculate_tfc_fn(
+                tf_array=0, l_d=l_d, l_avg=l_avg, k1=k1, b=b, delta=delta
+            )
+            nonoccurrence_array[token_id] = idf * tfc
 
     return nonoccurrence_array
 
