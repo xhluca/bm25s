@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -66,7 +67,7 @@ def merge_cqa_dupstack(data_path):
                         # add the corpus name to _id
                         line["_id"] = f"{corpus_name}_{line['_id']}"
                         # write back to file
-                        f.write(json_functions.dumps(line))
+                        f.write(json.dumps(line)) # json_functions.dumps generates json that can't be read by beir
                         f.write("\n")
 
     # now, do the same for queries.jsonl
