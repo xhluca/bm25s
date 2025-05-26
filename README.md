@@ -76,13 +76,13 @@ If you want to use stemming for better results, you can install the recommended 
 
 ```bash
 # Install all extra dependencies
-pip install bm25s[full]
+pip install "bm25s[full]"
 
 # If you want to use stemming for better results, you can install a stemmer
 pip install PyStemmer
 
 # To speed up the top-k selection process, you can install `jax`
-pip install jax[cpu]
+pip install "jax[cpu]"
 ```
 
 ## Quickstart
