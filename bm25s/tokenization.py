@@ -27,6 +27,7 @@ from .stopwords import (
     STOPWORDS_SWEDISH,
     STOPWORDS_NORWEGIAN,
     STOPWORDS_CHINESE,
+    STOPWORDS_TURKISH,
 )
 
 
@@ -244,7 +245,7 @@ class Tokenizer:
         path = save_dir / stopwords_name
 
         save_dir.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
+        with open(path, "w", encoding='utf-8') as f:
             f.write(json_functions.dumps(self.stopwords))
     
     def load_stopwords(self, save_dir: str, stopwords_name: str = "stopwords.tokenizer.json"):
@@ -261,7 +262,7 @@ class Tokenizer:
         """
         path = Path(save_dir) / stopwords_name
 
-        with open(path, "r") as f:
+        with open(path, "r", encoding='utf-8') as f:
             self.stopwords = json_functions.loads(f.read())
 
     def streaming_tokenize(
@@ -541,11 +542,13 @@ def _infer_stopwords(stopwords: Union[str, List[str]]) -> Union[List[str], tuple
         return STOPWORDS_NORWEGIAN
     elif stopwords in ["chinese", "zh"]:
         return STOPWORDS_CHINESE
+    elif stopwords in ["turkish", "tr"]:
+        return STOPWORDS_TURKISH
     elif stopwords in [None, False]:
         return []
     elif isinstance(stopwords, str):
         raise ValueError(
-            f"{stopwords} not recognized. Only English stopwords as default, German, Dutch, French, Spanish, Portuguese, Italian, Russian, Swedish, Norwegian, and Chinese are currently supported. "
+            f"{stopwords} not recognized. Only English stopwords as default, German, Dutch, French, Spanish, Portuguese, Italian, Russian, Swedish, Norwegian, Chinese and Turkish are currently supported. "
             "Please input a list of stopwords"
         )
     else:
