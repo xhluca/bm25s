@@ -31,10 +31,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r tests/requirements-core.txt
+        pip install coverage
     
-    - name: Run core tests with dependencies
+    - name: Run core tests with coverage
       run: |
-        python -m unittest tests/core/test_*.py
+        python -m coverage run --source=bm25s -m unittest discover tests/core
+        python -m coverage report --omit="*/tests/*,*/numba/*"
+        echo "Coverage percentage:"
+        python -m coverage report --omit="*/tests/*,*/numba/*" | tail -1 | awk '{print "Total Coverage: " $4}'
     
     - name: Install Numba
       run: |
