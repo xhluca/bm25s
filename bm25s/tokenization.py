@@ -647,7 +647,8 @@ def tokenize(
     token_to_index = {}
     
     # Create stopwords set once outside the loop for better performance
-    stopwords_set = set(stopwords)
+    # _infer_stopwords returns an empty list if stopwords is None/False
+    stopwords_set = set(stopwords) if stopwords else set()
 
     for text in tqdm(
         texts, desc="Split strings", leave=leave, disable=not show_progress
