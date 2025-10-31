@@ -32,13 +32,20 @@ def _calculate_doc_freqs(
         desc="BM25S Count Tokens",
     ):
         # Convert document tokens to set once per document for faster lookup
-        # This is more efficient than using set.intersection() which creates a new set
         unique_doc_tokens = set(doc_tokens)
         
-        # Only increment count for tokens that are in both the document and vocabulary
-        for token in unique_doc_tokens:
-            if token in doc_frequencies:
-                doc_frequencies[token] += 1
+        # Iterate over the smaller set for efficiency
+        # In typical BM25 scenarios, documents are smaller than vocabulary
+        if len(unique_doc_tokens) < len(unique_tokens):
+            # Document is smaller - iterate over document tokens
+            for token in unique_doc_tokens:
+                if token in doc_frequencies:
+                    doc_frequencies[token] += 1
+        else:
+            # Vocabulary is smaller - iterate over vocabulary
+            for token in unique_tokens:
+                if token in unique_doc_tokens:
+                    doc_frequencies[token] += 1
 
     return doc_frequencies
 

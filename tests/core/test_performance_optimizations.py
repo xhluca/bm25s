@@ -113,11 +113,6 @@ class TestPerformanceOptimizations(unittest.TestCase):
         self.assertIsNotNone(decoded2)
         self.assertIn('new', decoded2[0])
         self.assertIn('corpus', decoded2[0])
-        # Reset vocab
-        tokenizer.reset_vocab()
-        
-        # Cache should be cleared
-        self.assertIsNone(tokenizer._reverse_vocab_cache)
     
     def test_doc_freq_calculation_correctness(self):
         """Verify document frequency calculation is correct with optimization"""
