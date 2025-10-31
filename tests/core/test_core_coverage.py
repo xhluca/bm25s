@@ -312,6 +312,46 @@ class TestBM25CoreFunctions(unittest.TestCase):
             retriever.retrieve(query_tokens, k=2, weight_mask=weight_mask)
         self.assertIn("length of the weight_mask must be the same", str(context.exception))
 
+    def test_retrieve_with_corpus_as_ndarray(self):
+        """Test retrieve with corpus as numpy array"""
+        retriever = BM25()
+        retriever.index(self.corpus_tokens)
+        
+        query_tokens = [["cat", "feline"]]
+        
+        # Create corpus as numpy array
+        corpus = np.array(self.corpus)
+        
+        results = retriever.retrieve(query_tokens, corpus=corpus, k=2)
+        self.assertEqual(len(results.documents), 1)
+        self.assertEqual(len(results.documents[0]), 2)
+
+    def test_retrieve_return_as_documents(self):
+        """Test retrieve with return_as='documents'"""
+        retriever = BM25()
+        retriever.index(self.corpus_tokens)
+        
+        query_tokens = [["cat"]]
+        
+        # Test return_as='documents'
+        results = retriever.retrieve(query_tokens, k=2, return_as="documents")
+        
+        # Should return only documents, not Results tuple
+        self.assertIsInstance(results, np.ndarray)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(len(results[0]), 2)
+
+    def test_retrieve_with_invalid_return_as(self):
+        """Test retrieve with invalid return_as parameter"""
+        retriever = BM25()
+        retriever.index(self.corpus_tokens)
+        
+        query_tokens = [["cat"]]
+        
+        with self.assertRaises(ValueError) as context:
+            retriever.retrieve(query_tokens, k=2, return_as="invalid")
+        self.assertIn("return_as", str(context.exception))
+
 
 class TestBM25LoadingSaving(unittest.TestCase):
     """Test coverage for loading and saving functions"""
@@ -363,6 +403,44 @@ class TestBM25LoadingSaving(unittest.TestCase):
         
         # Verify save succeeded
         self.assertTrue(os.path.exists(os.path.join(self.tmpdir, "params.index.json")))
+
+    def test_load_with_load_vocab_false(self):
+        """Test load with load_vocab=False"""
+        retriever = BM25()
+        retriever.index(self.corpus_tokens)
+        retriever.save(self.tmpdir)
+        
+        # Load without vocab
+        loaded = BM25.load(self.tmpdir, load_vocab=False)
+        
+        # vocab_dict should be empty
+        self.assertEqual(len(loaded.vocab_dict), 0)
+
+    def test_load_corpus_with_mmap(self):
+        """Test load_corpus with mmap=True"""
+        retriever = BM25()
+        retriever.index(self.corpus_tokens)
+        retriever.save(self.tmpdir, corpus=self.corpus)
+        
+        # Load with mmap and corpus
+        loaded = BM25.load(self.tmpdir, load_corpus=True, mmap=True)
+        
+        # Corpus should be JsonlCorpus
+        self.assertIsInstance(loaded.corpus, bm25s.utils.corpus.JsonlCorpus)
+        loaded.corpus.close()
+
+    def test_load_corpus_without_mmap(self):
+        """Test load_corpus with mmap=False"""
+        retriever = BM25()
+        retriever.index(self.corpus_tokens)
+        retriever.save(self.tmpdir, corpus=self.corpus)
+        
+        # Load without mmap
+        loaded = BM25.load(self.tmpdir, load_corpus=True, mmap=False)
+        
+        # Corpus should be a list
+        self.assertIsInstance(loaded.corpus, list)
+        self.assertEqual(len(loaded.corpus), len(self.corpus))
 
 
 if __name__ == "__main__":
