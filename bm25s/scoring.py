@@ -31,14 +31,14 @@ def _calculate_doc_freqs(
         disable=not show_progress,
         desc="BM25S Count Tokens",
     ):
-
-        # get intersection of unique tokens and the tokens in the document
-        shared_tokens = unique_tokens.intersection(doc_tokens)
-
-        # for each token in the document, we increment the count of documents
-        # This is a simple way to count the number of documents that contain each token
-        for token in shared_tokens:
-            doc_frequencies[token] += 1
+        # Convert document tokens to set once per document for faster lookup
+        # This is more efficient than using set.intersection() which creates a new set
+        unique_doc_tokens = set(doc_tokens)
+        
+        # Only increment count for tokens that are in both the document and vocabulary
+        for token in unique_doc_tokens:
+            if token in doc_frequencies:
+                doc_frequencies[token] += 1
 
     return doc_frequencies
 

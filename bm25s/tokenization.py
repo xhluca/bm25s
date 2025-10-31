@@ -175,6 +175,8 @@ class Tokenizer:
         self.stem_to_sid = {}  # stem -> stemmed id, e.g. "appl" -> 0
         # word -> {stemmed, unstemmed} id, e.g. "apple" -> 0 (appl) or "apple" -> 2 (apple)
         self.word_to_id = {}
+        # Cache for reverse vocabulary mapping (used in decode)
+        self._reverse_vocab_cache = None
 
     def save_vocab(self, save_dir: str, vocab_name: str = "vocab.tokenizer.json"):
         """
@@ -228,6 +230,8 @@ class Tokenizer:
             self.word_to_stem = d["word_to_stem"]
             self.stem_to_sid = d["stem_to_sid"]
             self.word_to_id = d["word_to_id"]
+            # Invalidate reverse vocab cache when loading new vocabulary
+            self._reverse_vocab_cache = None
     
     def save_stopwords(self, save_dir: str, stopwords_name: str = "stopwords.tokenizer.json"):
         """
@@ -290,6 +294,10 @@ class Tokenizer:
             will return an empty list, which may cause issues if the tokenizer is not expecting
             an empty list. If True, the splitter will return a list with a single empty string.
         """
+        # Invalidate reverse vocab cache if we're updating vocabulary
+        if update_vocab is True:
+            self._reverse_vocab_cache = None
+        
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
         using_stopwords = stopwords_set is not None
         using_stemmer = self.stemmer is not None
@@ -500,8 +508,12 @@ class Tokenizer:
         List[List[str]]
             A list of lists of strings, each string being a word or a stemmed word if a stemmer is used.
         """
-        vocab = self.get_vocab_dict()
-        reverse_vocab = {v: k for k, v in vocab.items()}
+        # Use cached reverse vocab if available, otherwise create and cache it
+        if self._reverse_vocab_cache is None:
+            vocab = self.get_vocab_dict()
+            self._reverse_vocab_cache = {v: k for k, v in vocab.items()}
+        
+        reverse_vocab = self._reverse_vocab_cache
         return [[reverse_vocab[token_id] for token_id in doc] for doc in docs]
 
 
@@ -633,17 +645,19 @@ def tokenize(
     # Step 1: Split the strings using the regex pattern
     corpus_ids = []
     token_to_index = {}
+    
+    # Create stopwords set once outside the loop for better performance
+    stopwords_set = set(stopwords)
 
     for text in tqdm(
         texts, desc="Split strings", leave=leave, disable=not show_progress
     ):  
-        stopwords_set = set(stopwords)
         if lower:
             text = text.lower()
 
         splitted = split_fn(text)
 
-        if allow_empty is False and len(splitted) == 0:
+        if allow_empty is True and len(splitted) == 0:
             splitted = [""]
         
         doc_ids = []
