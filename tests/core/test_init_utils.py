@@ -89,7 +89,7 @@ class TestBM25SUtilityFunctions(unittest.TestCase):
             # Test that tqdm just returns the iterable
             test_list = [1, 2, 3]
             # The fake tqdm should just return the iterable as-is
-            
+            self.assertIs(bm25s.tqdm(test_list), test_list)
         finally:
             # Restore original value
             if original_tqdm is None:

@@ -54,8 +54,8 @@ class TestSelectionFunctions(unittest.TestCase):
         # Check that we got the right values (order doesn't matter)
         self.assertEqual(len(scores), 2)
         self.assertEqual(len(indices), 2)
-        self.assertTrue(4.0 in scores)
-        self.assertTrue(3.0 in scores)
+        self.assertIn(4.0, scores)
+        self.assertIn(3.0, scores)
 
     def test_topk_auto_backend(self):
         """Test topk with auto backend selection"""

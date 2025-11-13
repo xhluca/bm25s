@@ -71,7 +71,7 @@ class TestTokenizationEdgeCases(unittest.TestCase):
         tokenizer = Tokenizer()
         
         texts = ["hello world"]
-        result = tokenizer.tokenize(texts, update_vocab="if_empty", return_as="ids")
+        tokenizer.tokenize(texts, update_vocab="if_empty", return_as="ids")
         
         # Should have updated vocab
         self.assertGreater(len(tokenizer.word_to_id), 0)
@@ -83,7 +83,7 @@ class TestTokenizationEdgeCases(unittest.TestCase):
         tokenizer.word_to_id = {"hello": 0}
         
         texts = ["hello world"]
-        result = tokenizer.tokenize(texts, update_vocab="if_empty", return_as="ids")
+        tokenizer.tokenize(texts, update_vocab="if_empty", return_as="ids")
         
         # Should NOT have updated vocab with 'world'
         self.assertEqual(len(tokenizer.word_to_id), 1)
@@ -127,7 +127,7 @@ class TestTokenizationEdgeCases(unittest.TestCase):
         """Test tokenization with callable stemmer"""
         # Create a simple callable stemmer
         def simple_stemmer(tokens):
-            return [t[:3] for t in tokens]  # Just take first 3 chars
+            return [t[:3] for t in tokens]  # Take up to the first 3 chars (returns whole token if shorter)
         
         texts = ["running jumping"]
         result = bm25s.tokenize(texts, stemmer=simple_stemmer, return_ids=False)

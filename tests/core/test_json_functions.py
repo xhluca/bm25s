@@ -1,6 +1,4 @@
 import unittest
-import sys
-from unittest.mock import patch
 from bm25s.utils import json_functions
 
 

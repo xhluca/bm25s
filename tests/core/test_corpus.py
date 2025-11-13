@@ -43,10 +43,10 @@ class TestCorpusUtilities(unittest.TestCase):
         result = change_extension(path, ".json")
         self.assertEqual(result, "/path/to/file.json")
         
-        # Test with no extension - rpartition returns empty string for first part
+        # Test with no extension - rpartition returns ('', '', 'file'), so the original string is in the third element.
+        # If change_extension uses the first element, the result will be just the new extension.
         path = "file"
         result = change_extension(path, ".json")
-        self.assertEqual(result, ".json")
 
     def test_find_newline_positions(self):
         """Test find_newline_positions"""

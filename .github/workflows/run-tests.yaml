@@ -36,9 +36,10 @@ jobs:
     - name: Run core tests with coverage
       run: |
         python -m coverage run --source=bm25s -m unittest discover tests/core
-        python -m coverage report --omit="*/tests/*,*/numba/*"
+        COVERAGE_OUTPUT=$(python -m coverage report --omit="*/tests/*,*/numba/*")
+        echo "$COVERAGE_OUTPUT"
         echo "Coverage percentage:"
-        python -m coverage report --omit="*/tests/*,*/numba/*" | tail -1 | awk '{print "Total Coverage: " $4}'
+        echo "$COVERAGE_OUTPUT" | tail -1 | awk '{print "Total Coverage: " $4}'
     
     - name: Install Numba
       run: |
