@@ -349,6 +349,78 @@ results, scores = retriever.retrieve(query_tokens, k=2)
 For a complete example, check out:
 * [`examples/index_to_hf.py`](examples/index_to_hf.py) for indexing a corpus and upload to Huggingface Hub
 * [`examples/retrieve_from_hf.py`](examples/retrieve_from_hf.py) for loading an index alongside corpus from Huggingface Hub and querying it.
+* [`examples/mcp/create_index.py`](examples/mcp/create_index.py) for creating a test index for the MCP server.
+* [`examples/mcp/verify_server.py`](examples/mcp/verify_server.py) for programmatically verifying the MCP server.
+
+## MCP Server
+
+`bm25s` comes with a built-in Model Context Protocol (MCP) server, allowing you to expose your BM25 index as a tool for LLMs and other agents.
+
+### Installation
+
+To use the MCP server, you need to install `bm25s` with the `mcp` extra:
+
+```bash
+
+# first, create a virtual env
+python -m venv venv
+source venv/bin/activate
+
+# then, install bm25s with the mcp extra
+pip install "bm25s[mcp]"
+```
+
+### Launching the Server
+
+You can launch the MCP server using the `bm25` CLI:
+
+```bash
+source venv/bin/activate
+bm25 mcp launch --port 8000 --index-dir /path/to/your/index
+```
+
+### Example
+
+For example, you can create a test index and launch the server with:
+
+```bash
+source venv/bin/activate
+python examples/mcp/create_index.py # creates ./test_index_mcp
+bm25 mcp launch --port 8000 --index-dir ./test_index_mcp
+```
+
+Then, you can verify the server with:
+
+```bash
+python examples/mcp/verify_server.py
+```
+
+### Tools
+
+The server exposes the following tools:
+
+*   `retrieve(query: str, k: int = 10)`: Retrieves the top-k documents for a given query.
+*   `get_info()`: Returns information about the loaded index (vocabulary size, number of documents, backend).
+
+### Example Usage with Claude Desktop
+
+To use `bm25s` with Claude Desktop, add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "bm25s": {
+      "command": "bm25",
+      "args": [
+        "mcp",
+        "launch",
+        "--index-dir",
+        "/absolute/path/to/your/index"
+      ]
+    }
+  }
+}
+```
 
 ## Comparison
 
