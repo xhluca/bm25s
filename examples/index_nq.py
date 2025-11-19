@@ -52,4 +52,4 @@ def main(save_dir="datasets", index_dir="bm25s_indices/", dataset="nq"):
 
 
 if __name__ == "__main__":
-    main(dataset='msmarco')
+    main(dataset='nq')
