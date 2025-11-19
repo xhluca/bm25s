@@ -358,16 +358,20 @@ For a complete example, check out:
 
 ### Installation
 
-To use the MCP server, you need to install `bm25s` with the `mcp` extra:
+To use the MCP server, you need to install `bm25s` with the `mcp` extra. We recommend using `uv` for managing your environment:
 
 ```bash
+# Create a virtual environment
+uv venv
 
-# first, create a virtual env
-python -m venv venv
-source venv/bin/activate
+# Activate the virtual environment
+source .venv/bin/activate
 
-# then, install bm25s with the mcp extra
-pip install "bm25s[mcp]"
+# Install bm25s with the mcp extra
+uv pip install "bm25s[mcp]"
+
+# or locally:
+uv pip install -e ".[mcp]"
 ```
 
 ### Launching the Server
@@ -375,7 +379,7 @@ pip install "bm25s[mcp]"
 You can launch the MCP server using the `bm25` CLI:
 
 ```bash
-source venv/bin/activate
+source .venv/bin/activate
 bm25 mcp launch --port 8000 --index-dir /path/to/your/index
 ```
 
@@ -384,7 +388,7 @@ bm25 mcp launch --port 8000 --index-dir /path/to/your/index
 For example, you can create a test index and launch the server with:
 
 ```bash
-source venv/bin/activate
+source .venv/bin/activate
 python examples/mcp/create_index.py # creates ./test_index_mcp
 bm25 mcp launch --port 8000 --index-dir ./test_index_mcp
 ```
@@ -404,14 +408,18 @@ The server exposes the following tools:
 
 ### Example Usage with Claude Desktop
 
-To use `bm25s` with Claude Desktop, add the following to your `claude_desktop_config.json`:
+To use `bm25s` with Claude Desktop, add the following to your `claude_desktop_config.json` (located at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
   "mcpServers": {
     "bm25s": {
-      "command": "bm25",
+      "command": "/absolute/path/to/uv",
       "args": [
+        "--directory",
+        "/ABSOLUTE/PATH/TO/PARENT/FOLDER/bm25s",
+        "run",
+        "bm25",
         "mcp",
         "launch",
         "--index-dir",
@@ -421,6 +429,8 @@ To use `bm25s` with Claude Desktop, add the following to your `claude_desktop_co
   }
 }
 ```
+
+To find the absolute path to `uv`, you can run `which uv` in the terminal.
 
 ## Comparison
 
