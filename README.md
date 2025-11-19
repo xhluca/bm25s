@@ -389,8 +389,8 @@ For example, you can create a test index and launch the server with:
 
 ```bash
 source .venv/bin/activate
-python examples/mcp/create_index.py # creates ./test_index_mcp
-bm25 mcp launch --port 8000 --index-dir ./test_index_mcp
+python examples/index_nq.py # creates bm25s_indices/nq
+bm25 mcp launch --port 8000 --index-dir ./bm25s_indices/nq
 ```
 
 Then, you can verify the server with:
