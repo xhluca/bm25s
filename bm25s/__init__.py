@@ -47,6 +47,7 @@ from .scoring import (
     _calculate_doc_freqs,
     _build_idf_array,
     _build_nonoccurrence_array,
+    np_csc,
 )
 
 logger = logging.getLogger("bm25s")
@@ -357,6 +358,8 @@ class BM25:
         )
 
         # Now, we build the sparse matrix
+
+
         score_matrix = sp.csc_matrix(
             (scores_flat, (doc_idx, vocab_idx)),
             shape=(n_docs, n_vocab),
@@ -365,6 +368,17 @@ class BM25:
         data = score_matrix.data
         indices = score_matrix.indices
         indptr = score_matrix.indptr
+        print("Using scipy csc")
+        
+        # data, indices, indptr = np_csc(
+        #     data=scores_flat,
+        #     rows=doc_idx,
+        #     cols=vocab_idx,
+        #     shape=(n_docs, n_vocab),
+        #     dtype=self.int_dtype
+        # )
+        # print("Using numpy csc")
+
 
         scores = {
             "data": data,

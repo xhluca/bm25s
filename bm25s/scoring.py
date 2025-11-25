@@ -10,6 +10,53 @@ except ImportError:
     def tqdm(iterable, *args, **kwargs):
         return iterable
 
+def np_csc(data, rows, cols, shape, dtype=np.int32):
+    """
+    Builds a CSC matrix representation (data, indices, indptr) using pure NumPy.
+    Equivalent to scipy.sparse.csc_matrix((data, (rows, cols)), shape=shape)
+    
+    Parameters
+    ----------
+    data : np.ndarray
+        Flat array of data values.
+    rows : np.ndarray
+        Flat array of row indices.
+    cols : np.ndarray
+        Flat array of column indices.
+    shape : tuple
+        Shape of the matrix (n_rows, n_cols).
+    dtype : type
+        Data type for the indices and indptr.
+        
+    Returns
+    -------
+    data : np.ndarray
+        Sorted data array.
+    indices : np.ndarray
+        Sorted row indices.
+    indptr : np.ndarray
+        Index pointers for columns.
+    """
+    n_cols = shape[1]
+
+    # 1. Sort the data: Primary key = cols, Secondary key = rows
+    # We use lexsort ((secondary, primary))
+    sorter = np.lexsort((rows, cols))
+
+    # 2. Reorder arrays based on the sort
+    sorted_data = data[sorter]
+    sorted_indices = rows[sorter]
+    sorted_cols = cols[sorter]
+
+    # 3. Compute indptr
+    # bincount calculates the number of non-zeros in each column
+    col_counts = np.bincount(sorted_cols, minlength=n_cols)
+
+    # cumsum gives us the pointers (0, count[0], count[0]+count[1], ...)
+    indptr = np.zeros(n_cols + 1, dtype=dtype)
+    np.cumsum(col_counts, out=indptr[1:])
+
+    return sorted_data, sorted_indices, indptr
 
 def _calculate_doc_freqs(
     corpus_tokens, unique_tokens, show_progress=True, leave_progress=False
