@@ -10,7 +10,7 @@ from .selection import _numba_sorted_top_k
 
 _compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
 
-@njit(parallel=True)
+@njit(parallel=False)
 def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,
