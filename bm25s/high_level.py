@@ -14,13 +14,18 @@ import Stemmer
 
 class BM25Search:
     def __init__(
-        self, corpus, bm25_kwargs=None, tokenizer_kwargs=None, language="english"
+        self, corpus, language="english", bm25_kwargs=None, tokenizer_kwargs=None, tokenizer_cls=Tokenizer
     ):
-        self.leave_progress = leave_progress = False
-        self.show_progress = show_progress = True
-
+        if "corpus" in bm25_kwargs_default:
+            raise ValueError(
+                "The 'corpus' argument in bm25_kwargs is reserved and cannot be set manually."
+            )
         if language != "english":
             raise NotImplementedError("Currently only English language is supported.")
+
+        self.leave_progress = leave_progress = False
+        self.show_progress = show_progress = True
+        self.corpus = corpus
 
         stemmer = Stemmer.Stemmer("english")
         bm25_kwargs_default = dict(
@@ -31,37 +36,54 @@ class BM25Search:
         )
 
         if isinstance(bm25_kwargs, dict):
-            if "corpus" in bm25_kwargs:
-                raise ValueError(
-                    "The 'corpus' argument in bm25_kwargs is reserved and cannot be set manually."
-                )
             bm25_kwargs_default.update(bm25_kwargs)
+        elif bm25_kwargs is not None:
+            raise ValueError("bm25_kwargs must be a dict or None.")
+        
         if isinstance(tokenizer_kwargs, dict):
             tokenizer_kwargs_default.update(tokenizer_kwargs)
+        elif tokenizer_kwargs is not None:
+            raise ValueError("tokenizer_kwargs must be a dict or None.")
+        
+        if "corpus" in bm25_kwargs_default:
+            raise ValueError(
+                "The 'corpus' argument in bm25_kwargs is reserved and cannot be set manually."
+            )
 
-        # force the corpus to be set
-        bm25_kwargs_default["corpus"] = corpus
-
-        self.tokenizer = Tokenizer(**tokenizer_kwargs_default)
+        # note: we do not pass corpus here, as we will keep it separately. This means the BM25
+        # object will return document ids instead of texts when retrieving.
         self.retriever = BM25(**bm25_kwargs_default)
+        self.tokenizer = tokenizer_cls(**tokenizer_kwargs_default)
 
         # tokenize the corpus
-        token_ids = self.tokenizer.tokenize(
-            corpus, leave_progress=leave_progress, show_progress=show_progress
+        tokenized = self.tokenizer.tokenize(
+            corpus,
+            leave_progress=leave_progress,
+            show_progress=show_progress,
+            update_vocab=False,
+            return_as="tuple",
         )
 
         # compile and index
         self.retriever.compile(activate_numba=True, warmup=True)
         self.retriever.index(
-            token_ids,
+            tokenized,
             leave_progress=leave_progress,
             show_progress=show_progress,
             create_empty_token=True,
         )
 
     def search(self, queries, k=10, n_jobs=1):
-        tokenized_queries = self.tokenizer.tokenize(queries)
-        documents, scores = self.retriever.retrieve(
+        tokenized_queries = self.tokenizer.tokenize(
+            queries,
+            update_vocab=False,
+            show_progress=self.show_progress,
+            leave_progress=self.leave_progress,
+            return_as="tuple",
+        )
+        # note: because we did not pass `corpus` when initializing BM25,
+        # the retrieve() will return document ids instead of texts.
+        doc_ids, scores = self.retriever.retrieve(
             query_tokens=tokenized_queries,
             k=k,
             sorted=True,
@@ -73,18 +95,13 @@ class BM25Search:
             backend_selection="numpy",
         )
 
-        # return as list of dicts with kesy 'document' and 'score'
+        # return as list of dicts with keys 'document' and 'score'
         results = []
-        for doc_list, score_list in zip(documents, scores):
-            result = []
-            for doc, score in zip(doc_list, score_list):
-                if isinstance(doc, dict):
-                    doc_copy = doc.copy()
-                    doc_copy["score"] = score
-                    result.append(doc_copy)
-                else:
-                    result.append({"document": doc, "score": score})
-            results.append(result)
+        for i in range(doc_ids.shape[0]):
+            doc_id, score = doc_ids[i], scores[i]
+            doc_text = self.corpus[doc_id]
+            results.append({"id": doc_id, "score": score, "document": doc_text})
+        
         return results
 
 
