@@ -44,7 +44,7 @@ jobs:
       #   # Forces Numba to run as standard Python, preventing the JIT/Coverage crash
       #   NUMBA_DISABLE_JIT: 1
       run: |
-        pip uninstall numba
+        pip uninstall numba -y
         python -m coverage run --source=bm25s -m unittest discover tests/core
         
         COVERAGE_OUTPUT=$(python -m coverage report --omit="*/tests/*,*/numba/*")
