@@ -597,7 +597,7 @@ class BM25:
             indices=indices,
             num_docs=num_docs,
             query_tokens_ids=query_tokens_ids,
-            dtype=dtype,
+            dtype=np.dtype(dtype),
         )
 
         if weight_mask is not None:
@@ -1344,7 +1344,7 @@ class BM25:
             indices=dummy_indices,
             num_docs=num_docs,
             query_tokens_ids=dummy_query_tokens_ids,
-            dtype=self.dtype,
+            dtype=np.dtype(self.dtype),
         )
     
     def warmup_numba_csc(self):
