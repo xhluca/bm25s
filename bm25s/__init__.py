@@ -235,7 +235,7 @@ class BM25:
                 "scipy is not installed. Please install scipy to use the scipy csc_backend."
             )
         
-        if self.backend == "numba" and auto_compile:
+        if auto_compile and self.backend == "numba" and os.environ.get("NUMBA_DISABLE_JIT") in [None, False]:
             self.compile()
 
     @staticmethod
@@ -1289,6 +1289,10 @@ class BM25:
                 "Numba is not installed. Please install Numba to compile the Numba scorer with `pip install numba`."
             )
 
+        if os.environ.get("NUMBA_DISABLE_JIT") is not None:
+            # if NUMBA_DISABLE_JIT is set, we don't want to compile the Numba scorer
+            return
+
         from .scoring import _compute_relevance_from_scores_jit_ready
 
         self._compute_relevance_from_scores = njit(
@@ -1318,6 +1322,11 @@ class BM25:
         This will trigger the JIT compilation of the scoring function,
         ensuring that subsequent scoring operations are faster.
         """
+        if os.environ.get("NUMBA_DISABLE_JIT") is not None or NUMBA_AVAILABLE is False:
+            # if NUMBA_DISABLE_JIT is set or Numba is not available, we don't want to 
+            # warm up the Numba scorer
+            return
+        
         # Create dummy data for warmup
         dummy_data = np.array([1.0, 2.0, 3.0], dtype=self.dtype)
         dummy_indices = np.array([0, 1, 2], dtype=self.int_dtype)
