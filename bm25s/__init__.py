@@ -1265,7 +1265,7 @@ class BM25:
         self.activate_numba_csc()
         self.activate_numba_scorer()
         self.warmup_numba_csc()
-        # self.warmup_numba_scorer()
+        self.warmup_numba_scorer()
     
     def activate_numba_scorer(self):
         """
@@ -1334,15 +1334,15 @@ class BM25:
         dummy_query_tokens_ids = np.array([0, 1, 2], dtype=self.int_dtype)
         num_docs = 1
 
-        # Run the warmup scoring
-        return self._compute_relevance_from_scores(
-            data=dummy_data,
-            indptr=dummy_indptr,
-            indices=dummy_indices,
-            num_docs=num_docs,
-            query_tokens_ids=dummy_query_tokens_ids,
-            dtype=np.dtype(self.dtype),
-        )
+        # # Run the warmup scoring
+        # return self._compute_relevance_from_scores(
+        #     data=dummy_data,
+        #     indptr=dummy_indptr,
+        #     indices=dummy_indices,
+        #     num_docs=num_docs,
+        #     query_tokens_ids=dummy_query_tokens_ids,
+        #     dtype=np.dtype(self.dtype),
+        # )
     
     def warmup_numba_csc(self):
         """
