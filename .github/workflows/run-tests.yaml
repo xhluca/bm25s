@@ -52,10 +52,13 @@ jobs:
   test-numba:
     runs-on: ubuntu-latest
     env:
-      # Keep these to prevent threading conflicts
       OMP_NUM_THREADS: '1'
       MKL_NUM_THREADS: '1'
-      NUMBA_NUM_THREADS: '1' # Add this for Numba specifically
+      NUMBA_NUM_THREADS: '1'
+      # Disable TQDM monitor thread to reduce threading noise during segfaults
+      TQDM_DISABLE: '1'
+      NUMBA_DISABLE_INTEL_SVML: '1' # Disable SVML to prevent vectorization crashes
+      NUMBA_ENABLE_AVX: '0'         # Disable AVX if crashes persist
     steps:
     - name: Check out repository
       uses: actions/checkout@v2
