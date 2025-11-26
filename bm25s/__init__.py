@@ -153,6 +153,7 @@ class BM25:
         corpus=None,
         backend="numpy",
         csc_backend="numpy",
+        auto_compile=True,
     ):
         """
         BM25S initialization.
@@ -199,6 +200,10 @@ class BM25:
             it will use the scipy.sparse.csc_matrix to construct the CSC matrix, which requires scipy as a 
             dependency. Note that `scipy` might be faster than `numpy`, but if you activate the numba backend,
             the difference is negligible.
+        
+        auto_compile : bool
+            If True, it will automatically compile the JIT functions when using the numba backend.
+            This may take some time during the first run, but will speed up subsequent runs.
         """
         self.k1 = k1
         self.b = b
@@ -230,6 +235,8 @@ class BM25:
                 "scipy is not installed. Please install scipy to use the scipy csc_backend."
             )
         
+        if self.backend == "numba" and auto_compile:
+            self.compile()
 
     @staticmethod
     def _infer_corpus_object(corpus):
@@ -1252,7 +1259,10 @@ class BM25:
         to the JIT-compiled version of the function, and the `_np_csc` method to the
         JIT-compiled version of the CSC builder.
         """
-
+        if NUMBA_AVAILABLE is False:
+            raise ImportError(
+                "Numba is not installed. Please install Numba to compile the BM25 index with `pip install numba`."
+            )
         self.activate_numba_scorer()
         self.activate_numba_csc()
         self.warmup_numba_scorer()
