@@ -14,6 +14,16 @@ except ImportError:
         "Please install the huggingface_hub package to use the HuggingFace integrations for bm25s. You can install it via `pip install huggingface_hub`."
     )
 
+def _faketqdm(iterable, *args, **kwargs):
+    return iterable
+try:
+    if os.environ.get("DISABLE_TQDM", False):
+        tqdm = _faketqdm
+    else:
+        from tqdm.auto import tqdm
+except ImportError:
+    tqdm = _faketqdm
+
 README_TEMPLATE = """---
 language: en
 library_name: bm25s
@@ -175,8 +185,6 @@ To cite `bm25s`, please use the following bibtex:
 
 
 def batch_tokenize(tokenizer, texts, add_special_tokens=False):
-    from tqdm.auto import tqdm
-
     tokenizer_kwargs = dict(
         return_attention_mask=False,
         return_token_type_ids=False,

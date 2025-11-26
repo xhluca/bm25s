@@ -9,13 +9,16 @@ try:
 except ImportError:
     import json
 
+
+def _faketqdm(iterable, *args, **kwargs):
+    return iterable
 try:
-    from tqdm.auto import tqdm
-    TQDM_AVAILABLE = True
+    if os.environ.get("DISABLE_TQDM", False):
+        tqdm = _faketqdm
+    else:
+        from tqdm.auto import tqdm
 except ImportError:
-    TQDM_AVAILABLE = False
-    def tqdm(iterable=None, *args, **kwargs):
-        return iterable
+    tqdm = _faketqdm
 
 from . import json_functions
 

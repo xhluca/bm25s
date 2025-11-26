@@ -3,15 +3,19 @@ from pathlib import Path
 import re
 from typing import Any, Dict, List, Union, Callable, NamedTuple
 import typing
+import os
 
 from bm25s.utils import json_functions
 
+def _faketqdm(iterable, *args, **kwargs):
+    return iterable
 try:
-    from tqdm.auto import tqdm
+    if os.environ.get("DISABLE_TQDM", False):
+        tqdm = _faketqdm
+    else:
+        from tqdm.auto import tqdm
 except ImportError:
-
-    def tqdm(iterable, *args, **kwargs):
-        return iterable
+    tqdm = _faketqdm
 
 
 from .stopwords import (

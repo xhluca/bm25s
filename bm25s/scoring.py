@@ -2,13 +2,17 @@ from collections import Counter
 import math
 
 import numpy as np
+import os
 
+def _faketqdm(iterable, *args, **kwargs):
+    return iterable
 try:
-    from tqdm.auto import tqdm
+    if os.environ.get("DISABLE_TQDM", False):
+        tqdm = _faketqdm
+    else:
+        from tqdm.auto import tqdm
 except ImportError:
-
-    def tqdm(iterable, *args, **kwargs):
-        return iterable
+    tqdm = _faketqdm
 
 try:
     from numba import njit
