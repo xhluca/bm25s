@@ -59,7 +59,7 @@ jobs:
     - name: Run numba tests
       # 3. Numba tests usually need their own separate run without coverage interference
       run: |
-        python -X faulthandler -m unittest tests/numba/test_*.py
+        python -X faulthandler -m unittest discover tests/numba
         
   test-comparison:
     runs-on: ubuntu-latest
