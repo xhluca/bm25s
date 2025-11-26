@@ -1262,10 +1262,10 @@ class BM25:
             raise ImportError(
                 "Numba is not installed. Please install Numba to compile the BM25 index with `pip install numba`."
             )
-        self.activate_numba_scorer()
         self.activate_numba_csc()
-        self.warmup_numba_scorer()
+        self.activate_numba_scorer()
         self.warmup_numba_csc()
+        self.warmup_numba_scorer()
     
     def activate_numba_scorer(self):
         """
@@ -1335,7 +1335,7 @@ class BM25:
         num_docs = 1
 
         # Run the warmup scoring
-        _ = self._compute_relevance_from_scores(
+        scores = self._compute_relevance_from_scores(
             data=dummy_data,
             indptr=dummy_indptr,
             indices=dummy_indices,

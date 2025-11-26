@@ -40,9 +40,6 @@ jobs:
         pip install coverage
     
     - name: Run core tests with coverage
-      # env:
-      #   # Forces Numba to run as standard Python, preventing the JIT/Coverage crash
-      #   NUMBA_DISABLE_JIT: 1
       run: |
         pip uninstall numba -y
         python -m coverage run --source=bm25s -m unittest discover tests/core
@@ -51,16 +48,31 @@ jobs:
         echo "$COVERAGE_OUTPUT"
         echo "Coverage percentage:"
         echo "$COVERAGE_OUTPUT" | tail -1 | awk '{print "Total Coverage: " $4}'   
-    
-    - name: Install Numba
+
+  test-numba:
+    runs-on: ubuntu-latest
+    env:
+      # Keep these to prevent threading conflicts
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      NUMBA_NUM_THREADS: '1' # Add this for Numba specifically
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    - name: Install Numba dependencies
       run: |
         pip install "numba>=0.62.0"
-
+        pip install -r tests/requirements-core.txt
+        # Ensure we don't have conflicting versions
+        pip install --upgrade numpy
     - name: Run numba tests
-      # 3. Numba tests usually need their own separate run without coverage interference
       run: |
         python -X faulthandler -m unittest discover tests/numba
-        
+
   test-comparison:
     runs-on: ubuntu-latest
     steps:
