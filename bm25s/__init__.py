@@ -13,9 +13,17 @@ import numpy as np
 from .utils import json_functions as json_functions
 
 try:
+    from numba import njit
     from .numba import selection as selection_jit
+    NUMBA_AVAILABLE = True
 except ImportError:
-    selection_jit = None
+    njit = lambda x: x  # type: ignore
+    NUMBA_AVAILABLE = False
+try:
+    import scipy.sparse as sp
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
 
 try:
     from .numba.retrieve_utils import _retrieve_numba_functional
@@ -37,7 +45,8 @@ else:
         tqdm = _faketqdm
 
 
-from . import selection, utils, stopwords, scoring, tokenization
+from . import utils, stopwords, scoring, tokenization
+from . import selection as selection_np
 from .version import __version__
 from .tokenization import tokenize
 from .scoring import (
@@ -143,6 +152,7 @@ class BM25:
         int_dtype="int32",
         corpus=None,
         backend="numpy",
+        csc_backend="numpy",
     ):
         """
         BM25S initialization.
@@ -182,6 +192,13 @@ class BM25:
             to use the numba backend, which requires the numba library. If you select `backend="auto"`,
             the function will use the numba backend if it is available, otherwise it will use the numpy
             backend.
+        
+        csc_backend : str
+            The backend used for constructing the CSC matrix. Choose from 'scipy' or 'numpy'. By default,
+            it uses the 'numpy' backend, which does not require scipy as a dependency. If you select 'scipy',
+            it will use the scipy.sparse.csc_matrix to construct the CSC matrix, which requires scipy as a 
+            dependency. Note that `scipy` might be faster than `numpy`, but if you activate the numba backend,
+            the difference is negligible.
         """
         self.k1 = k1
         self.b = b
@@ -193,11 +210,26 @@ class BM25:
         self.methods_requiring_nonoccurrence = ("bm25l", "bm25+")
         self.corpus = corpus
         self._original_version = __version__
+        self.csc_backend = csc_backend
 
         if backend == "auto":
-            self.backend = "numba" if selection_jit is not None else "numpy"
+            self.backend = "numba" if NUMBA_AVAILABLE else "numpy"
         else:
             self.backend = backend
+        
+        if csc_backend == "auto":
+            self.csc_backend = "scipy" if SCIPY_AVAILABLE else "numpy"
+        
+        if self.backend == "numba" and not NUMBA_AVAILABLE:
+            raise ImportError(
+                "Numba is not installed. Please install numba with `pip install numba` to use the numba backend."
+            )
+        
+        if csc_backend == "scipy" and not SCIPY_AVAILABLE:
+            raise ImportError(
+                "scipy is not installed. Please install scipy to use the scipy csc_backend."
+            )
+        
 
     @staticmethod
     def _infer_corpus_object(corpus):
@@ -302,6 +334,11 @@ class BM25:
         leave_progress : bool
             If True, the progress bars will remain after the function completes.
         """
+        if self.csc_backend not in ["scipy", "numpy"]:
+            raise ValueError(
+                f"Invalid csc_backend value: {self.csc_backend}. Choose from 'scipy', 'numpy'."
+            )
+
         avg_doc_len = np.array([len(doc_ids) for doc_ids in corpus_token_ids]).mean()
         n_docs = len(corpus_token_ids)
         n_vocab = len(unique_token_ids)
@@ -357,13 +394,26 @@ class BM25:
         )
 
         # Now, we build the sparse matrix
-        data, indices, indptr = self._np_csc(
-            data=scores_flat,
-            rows=doc_idx,
-            cols=vocab_idx,
-            shape=(n_docs, n_vocab),
-            dtype=self.dtype,
-        )
+        if self.csc_backend == "scipy":
+            score_matrix = sp.csc_matrix(
+                (scores_flat, (doc_idx, vocab_idx)),
+                shape=(n_docs, n_vocab),
+                dtype=self.dtype,
+            )
+            data = score_matrix.data
+            indices = score_matrix.indices
+            indptr = score_matrix.indptr
+        elif self.csc_backend == "numpy":
+            data, indices, indptr = self._np_csc(
+                data=scores_flat,
+                rows=doc_idx,
+                cols=vocab_idx,
+                shape=(n_docs, n_vocab),
+                dtype=self.dtype,
+            )
+        else:
+            raise ValueError(f"Invalid csc_backend value: {self.csc_backend}. Choose from 'scipy', 'numpy'.")
+
 
         scores = {
             "data": data,
@@ -595,7 +645,7 @@ class BM25:
             scores_q = self.get_scores(query_tokens_single, weight_mask=weight_mask)
 
         if backend.startswith("numba"):
-            if selection_jit is None:
+            if NUMBA_AVAILABLE is False:
                 raise ImportError(
                     "Numba is not installed. Please install numba to use the numba backend."
                 )
@@ -603,7 +653,7 @@ class BM25:
                 scores_q, k=k, sorted=sorted, backend=backend
             )
         else:
-            topk_scores, topk_indices = selection.topk(
+            topk_scores, topk_indices = selection_np.topk(
                 scores_q, k=k, sorted=sorted, backend=backend
             )
 
@@ -1189,6 +1239,25 @@ class BM25:
         """
         return _np_csc_python(data, rows, cols, shape, dtype)
 
+    def compile(self):
+        """
+        Compile the Numba functions for the BM25 index. This will apply the Numba JIT
+        compilation to the `_compute_relevance_from_scores` function and the CSC builder,
+        which will speed up the scoring process and index construction.
+
+        This function requires the `numba` package to be installed. If it is not installed,
+        an ImportError will be raised. You can install Numba with `pip install numba`.
+
+        Behind the scenes, this will reassign the `_compute_relevance_from_scores` method
+        to the JIT-compiled version of the function, and the `_np_csc` method to the
+        JIT-compiled version of the CSC builder.
+        """
+
+        self.activate_numba_scorer()
+        self.activate_numba_csc()
+        self.warmup_numba_scorer()
+        self.warmup_numba_csc()
+    
     def activate_numba_scorer(self):
         """
         Activate the Numba scorer for the BM25 index. This will apply the Numba JIT
@@ -1240,11 +1309,6 @@ class BM25:
         This will trigger the JIT compilation of the scoring function,
         ensuring that subsequent scoring operations are faster.
         """
-        if not hasattr(self, "_compute_relevance_from_scores"):
-            raise ValueError(
-                "The Numba scorer is not activated. Please call `activate_numba_scorer` first."
-            )
-    
         # Create dummy data for warmup
         dummy_data = np.array([1.0, 2.0, 3.0], dtype=self.dtype)
         dummy_indices = np.array([0, 1, 2], dtype=self.int_dtype)
@@ -1268,11 +1332,6 @@ class BM25:
         This will trigger the JIT compilation of the CSC builder function,
         ensuring that subsequent CSC constructions are faster.
         """
-        if not hasattr(self, "_np_csc"):
-            raise ValueError(
-                "The Numba CSC builder is not activated. Please call `activate_numba_csc` first."
-            )
-    
         # Create dummy data for warmup
         dummy_data = np.array([1.0, 2.0, 3.0], dtype=self.dtype)
         dummy_rows = np.array([0, 1, 2], dtype=self.int_dtype)
