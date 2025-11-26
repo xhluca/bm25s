@@ -2,7 +2,7 @@
 
 <h1>BM25S⚡</h1>
 
-<i>BM25S (or BM25-Sparse) is an ultrafast implementation of BM25 in pure Python, powered by Scipy sparse matrices</i>
+<i>BM25S (or BM25-Sparse) is an ultrafast implementation of BM25 in pure Python, powered by Numpy</i>
 
 <table>
       <tr>
@@ -36,8 +36,8 @@
 Welcome to `bm25s`, a library that implements BM25 in Python, allowing you to rank documents based on a query. BM25 is a widely used ranking function used for text retrieval tasks, and is a core component of search services like Elasticsearch.
 
 It is designed to be:
-* **Fast**: `bm25s` is implemented in pure Python and leverage Scipy sparse matrices to store eagerly computed scores for all document tokens. This allows extremely fast scoring at query time, improving performance over popular libraries by orders of magnitude (see benchmarks below).
-* **Simple**: `bm25s` is designed to be easy to use and understand. You can install it with pip and start using it in minutes. There is no dependencies on Java or Pytorch - all you need is Scipy and Numpy, and optional lightweight dependencies for stemming.
+* **Fast**: `bm25s` is implemented in pure Python and leverage sparse matrices to store eagerly computed scores for all document tokens. This allows extremely fast scoring at query time, improving performance over popular libraries by orders of magnitude (see benchmarks below).
+* **Simple**: `bm25s` is designed to be easy to use and understand. You can install it with pip and start using it in minutes. There is no dependencies on Java or Pytorch - all you need is Numpy, and optional lightweight dependencies for stemming and speedup via `numba` compilation.
 
 Below, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25`, the most popular Python implementation of BM25. We measure the throughput in queries per second (QPS) on a few popular datasets from [BEIR](https://github.com/beir-cellar/beir) in a single-threaded setting.
 
@@ -435,7 +435,7 @@ To find the absolute path to `uv`, you can run `which uv` in the terminal.
 ## Comparison
 
 Here are some benchmarks comparing `bm25s` to other popular BM25 implementations. We compare the following implementations:
-* `bm25s`: Our implementation of BM25 in pure Python, powered by Scipy sparse matrices.
+* `bm25s`: Our implementation of BM25 in pure Python, powered by Numpy and sparse matrices.
 * `rank-bm25` (`Rank`): A popular Python implementation of BM25.
 * `bm25_pt` (`PT`): A Pytorch implementation of BM25.
 * `elasticsearch` (`ES`): Elasticsearch with BM25 configurations.
@@ -468,16 +468,17 @@ More detailed benchmarks can be found in the [bm25-benchmarks repo](https://gith
 
 ### Disk usage
 
-`bm25s` is designed to be lightweight. This means the total disk usage of the package is minimal, as it only requires wheels for `numpy` (18MB), `scipy` (37MB), and the package itself is less than 100KB. After installation, the full virtual environment takes more space than `rank-bm25` but less than `pyserini` and `bm25_pt`:
+`bm25s` is designed to be lightweight. This means the total disk usage of the package is minimal, as it only requires wheels for `numpy` (18MB), and the package itself is less than 100KB. After installation, the full virtual environment takes more space than `rank-bm25` but less than `pyserini` and `bm25_pt`:
 
 | Package           | Disk Usage |
 | ----------------- | ---------- |
-| venv (no package) | 45MB       |
-| `rank-bm25`       | 99MB       |
-| `bm25s` (ours)    | 479MB      |
+| venv (no package) | 21MB       |
+| `bm25s` (ours)    | 51MB       |
+| `rank-bm25`       | 51MB       |
+| `bm25s` (w/ core) | 188MB      |
+| `elastic`         | 1183MB     |
 | `bm25_pt`         | 5346MB     |
 | `pyserini`        | 6976MB     |
-| `elastic`         | 1183MB     |
 
 <details>
 <summary>Show Details</summary>
@@ -485,12 +486,13 @@ More detailed benchmarks can be found in the [bm25-benchmarks repo](https://gith
 The disk usage of the virtual environments is calculated using the following command:
 
 ```
-$ du -s *env-* --block-size=1MB
+$ du -sh venv* --block-size=1MB
 6976    conda-env-pyserini
 5346    venv-bm25-pt
-479     venv-bm25s
-45      venv-empty
-99      venv-rank-bm25
+51     venv-bm25s
+188     venv-bm25s-core
+21      venv-empty
+51      venv-rank-bm25
 ```
 
 For `pyserini`, we use the [recommended installation](https://github.com/castorini/pyserini/blob/master/docs/installation.md) with conda environment to account for Java dependencies.

@@ -27,7 +27,8 @@ class TestNumbaBackendRetrieve(unittest.TestCase):
         corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=stemmer)
 
         # Create the BM25 model and index the corpus
-        retriever = bm25s.BM25(method='bm25+', backend="numba", corpus=corpus)
+        retriever = bm25s.BM25(method='bm25+', backend="numba", corpus=corpus, auto_compile=False)
+        retriever.compile(activate_numba=True, warmup=False)
         retriever.index(corpus_tokens)
 
         # Save the retriever to temp dir
@@ -75,7 +76,9 @@ class TestNumbaBackendRetrieve(unittest.TestCase):
             nnoc_name="nonoccurrence_array.npy",
             params_name="params.json",
             load_corpus=True,
+            auto_compile=False,
         )
+        retriever.compile(activate_numba=True, warmup=False)
 
         self.assertTrue(retriever.backend == "numba", "The backend should be 'numba'")
 
@@ -112,8 +115,10 @@ class TestNumbaBackendRetrieve(unittest.TestCase):
             nnoc_name="nonoccurrence_array.npy",
             params_name="params.json",
             load_corpus=True,
-            mmap=True
+            mmap=True,
+            auto_compile=False,
         )
+        retriever.compile(activate_numba=True, warmup=False)
 
         self.assertTrue(retriever.backend == "numba", "The backend should be 'numba'")
 
@@ -152,7 +157,9 @@ class TestNumbaBackendRetrieve(unittest.TestCase):
                 nnoc_name="nonoccurrence_array.npy",
                 params_name="params.json",
                 load_corpus=True,
+                auto_compile=False,
             )
+            retriever.compile(activate_numba=True, warmup=False)
 
             self.assertTrue(retriever.backend == "numba", "The backend should be 'numba'")
 
