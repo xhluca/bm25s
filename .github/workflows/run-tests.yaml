@@ -33,13 +33,13 @@ jobs:
         pip install -r tests/requirements-core.txt
         pip install coverage
     
+    - name: Install Numba
+      run: |
+        pip install "numba>=0.62.0"
+
     - name: Run core tests
       run: |
           python  -m unittest discover tests/core
-
-    - name: Install Numba
-      run: |
-        pip install "numba>=0.60.0"
 
     - name: Run numba tests
       run: |
