@@ -9,6 +9,12 @@ on:
 jobs:
   test-core:
     runs-on: ubuntu-latest
+    
+    # 1. Set global environment variables to prevent threading crashes
+    env:
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
 
     steps:
     - name: Check out repository
@@ -34,9 +40,9 @@ jobs:
         pip install coverage
     
     - name: Run core tests with coverage
+      # 2. Added --concurrency=thread to explicitly handle Python threads
       run: |
-        python -m coverage run --source=bm25s -m unittest discover tests/core
-        # python -X faulthandler -m coverage run --source=bm25s -m unittest discover tests/core
+        python -m coverage run --concurrency=thread --source=bm25s -m unittest discover tests/core
         COVERAGE_OUTPUT=$(python -m coverage report --omit="*/tests/*,*/numba/*")
         echo "$COVERAGE_OUTPUT"
         echo "Coverage percentage:"
@@ -47,13 +53,12 @@ jobs:
         pip install "numba>=0.62.0"
 
     - name: Run numba tests
+      # 3. Numba tests usually need their own separate run without coverage interference
       run: |
         python -m unittest tests/numba/test_*.py
-        # - name: Run core tests with coverage
-    
+        
   test-comparison:
     runs-on: ubuntu-latest
-
     steps:
     - name: Check out repository
       uses: actions/checkout@v2
@@ -62,8 +67,7 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: '3.10'
-    
-    
+
     - name: Cache Python dependencies
       uses: actions/cache@v4
       with:
@@ -80,4 +84,3 @@ jobs:
     - name: Run comparison tests with dependencies
       run: |
         python -m unittest tests/comparison/test_*.py
-
