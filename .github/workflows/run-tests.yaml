@@ -40,15 +40,22 @@ jobs:
         pip install coverage
     
     - name: Run core tests with coverage
+      env:
+        # Forces Numba to run as standard Python, preventing the JIT/Coverage crash
+        NUMBA_DISABLE_JIT: 1
+        # Keeps threading safe
+        OMP_NUM_THREADS: 1
+        MKL_NUM_THREADS: 1
+        OPENBLAS_NUM_THREADS: 1
       run: |
-        # Added --timid to force pure-Python tracing and avoid C-extension crashes
-        python -X faulthandler -m coverage run --source=bm25s -m unittest discover tests/core
+        # You can remove -X faulthandler now, this is the root cause fix
+        python -m coverage run --source=bm25s -m unittest discover tests/core
         
         COVERAGE_OUTPUT=$(python -m coverage report --omit="*/tests/*,*/numba/*")
         echo "$COVERAGE_OUTPUT"
         echo "Coverage percentage:"
-        echo "$COVERAGE_OUTPUT" | tail -1 | awk '{print "Total Coverage: " $4}'
-   
+        echo "$COVERAGE_OUTPUT" | tail -1 | awk '{print "Total Coverage: " $4}'   
+    
     - name: Install Numba
       run: |
         pip install "numba>=0.62.0"
