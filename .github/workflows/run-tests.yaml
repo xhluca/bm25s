@@ -42,7 +42,7 @@ jobs:
     - name: Run core tests with coverage
       run: |
         # Added --timid to force pure-Python tracing and avoid C-extension crashes
-        python -m coverage run --timid --source=bm25s -m unittest discover tests/core
+        python -X faulthandler -m coverage run --source=bm25s -m unittest discover tests/core
         
         COVERAGE_OUTPUT=$(python -m coverage report --omit="*/tests/*,*/numba/*")
         echo "$COVERAGE_OUTPUT"
@@ -56,7 +56,7 @@ jobs:
     - name: Run numba tests
       # 3. Numba tests usually need their own separate run without coverage interference
       run: |
-        python -m unittest tests/numba/test_*.py
+        python -X faulthandler -m unittest tests/numba/test_*.py
         
   test-comparison:
     runs-on: ubuntu-latest
