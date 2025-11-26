@@ -10,19 +10,25 @@ from pathlib import Path
 from . import BM25
 from .tokenization import Tokenizer
 import Stemmer
+from typing import List, Tuple, Dict
 
 
 class BM25Search:
     def __init__(
-        self, corpus, language="english", bm25_kwargs=None, tokenizer_kwargs=None, tokenizer_cls=Tokenizer
+        self,
+        corpus: List[str],
+        language: str = "english",
+        bm25_kwargs: dict = None,
+        tokenizer_kwargs: dict = None,
+        tokenizer_cls: Tokenizer = Tokenizer,
     ):
-        if "corpus" in bm25_kwargs_default:
+        if "corpus" in bm25_kwargs:
             raise ValueError(
                 "The 'corpus' argument in bm25_kwargs is reserved and cannot be set manually."
             )
         if language != "english":
             raise NotImplementedError("Currently only English language is supported.")
-
+        
         self.leave_progress = leave_progress = False
         self.show_progress = show_progress = True
         self.corpus = corpus
@@ -39,12 +45,12 @@ class BM25Search:
             bm25_kwargs_default.update(bm25_kwargs)
         elif bm25_kwargs is not None:
             raise ValueError("bm25_kwargs must be a dict or None.")
-        
+
         if isinstance(tokenizer_kwargs, dict):
             tokenizer_kwargs_default.update(tokenizer_kwargs)
         elif tokenizer_kwargs is not None:
             raise ValueError("tokenizer_kwargs must be a dict or None.")
-        
+
         if "corpus" in bm25_kwargs_default:
             raise ValueError(
                 "The 'corpus' argument in bm25_kwargs is reserved and cannot be set manually."
@@ -53,7 +59,7 @@ class BM25Search:
         # note: we do not pass corpus here, as we will keep it separately. This means the BM25
         # object will return document ids instead of texts when retrieving.
         self.retriever = BM25(**bm25_kwargs_default)
-        self.tokenizer = tokenizer_cls(**tokenizer_kwargs_default)
+        self.tokenizer: Tokenizer = tokenizer_cls(**tokenizer_kwargs_default)
 
         # tokenize the corpus
         tokenized = self.tokenizer.tokenize(
@@ -73,7 +79,7 @@ class BM25Search:
             create_empty_token=True,
         )
 
-    def search(self, queries, k=10, n_jobs=1):
+    def search(self, queries: List[str], k: int = 10, n_jobs: int = 1):
         tokenized_queries = self.tokenizer.tokenize(
             queries,
             update_vocab=False,
@@ -95,19 +101,24 @@ class BM25Search:
             backend_selection="numpy",
         )
 
-        # return as list of dicts with keys 'document' and 'score'
+        # return as list of of lists of dicts with keys 'document' and 'score'
+        # the outer list is for each query, the inner list is for each of the k documents retrieved for that query
         results = []
-        for i in range(doc_ids.shape[0]):
-            doc_id, score = doc_ids[i], scores[i]
-            doc_text = self.corpus[doc_id]
-            results.append({"id": doc_id, "score": score, "document": doc_text})
-        
+        num_queries = doc_ids.shape[0]
+        num_docs = doc_ids.shape[1]
+        for qi in range(num_queries):
+            query_results = []
+            for di in range(num_docs):
+                doc_id = doc_ids[qi, di]
+                doc_text = self.corpus[doc_id]
+                query_results.append({"id": doc_id, "score": scores[qi, di], "document": doc_text})
+            results.append(query_results)
+
         return results
 
 
-def index(documents):
-    # TODO: implement indexing logic, returns BM25Search instance
-    pass
+def index(documents, language: str = "english"):
+    return BM25Search(corpus=documents, language=language)
 
 
 def load(path, document_column=None):
