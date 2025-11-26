@@ -47,7 +47,8 @@ from .scoring import (
     _calculate_doc_freqs,
     _build_idf_array,
     _build_nonoccurrence_array,
-    np_csc,
+    _np_csc_python,
+    _np_csc_jit_ready,
 )
 
 logger = logging.getLogger("bm25s")
@@ -301,8 +302,6 @@ class BM25:
         leave_progress : bool
             If True, the progress bars will remain after the function completes.
         """
-        import scipy.sparse as sp
-
         avg_doc_len = np.array([len(doc_ids) for doc_ids in corpus_token_ids]).mean()
         n_docs = len(corpus_token_ids)
         n_vocab = len(unique_token_ids)
@@ -358,27 +357,13 @@ class BM25:
         )
 
         # Now, we build the sparse matrix
-
-
-        score_matrix = sp.csc_matrix(
-            (scores_flat, (doc_idx, vocab_idx)),
+        data, indices, indptr = self._np_csc(
+            data=scores_flat,
+            rows=doc_idx,
+            cols=vocab_idx,
             shape=(n_docs, n_vocab),
             dtype=self.dtype,
         )
-        data = score_matrix.data
-        indices = score_matrix.indices
-        indptr = score_matrix.indptr
-        print("Using scipy csc")
-        
-        # data, indices, indptr = np_csc(
-        #     data=scores_flat,
-        #     rows=doc_idx,
-        #     cols=vocab_idx,
-        #     shape=(n_docs, n_vocab),
-        #     dtype=self.int_dtype
-        # )
-        # print("Using numpy csc")
-
 
         scores = {
             "data": data,
@@ -1196,6 +1181,14 @@ class BM25:
 
         return bm25_obj
 
+    @staticmethod
+    def _np_csc(data, rows, cols, shape, dtype):
+        """
+        Default Hybrid CSC builder. Uses pure Python/NumPy by default.
+        Can be swapped with a Numba version via `activate_numba_csc`.
+        """
+        return _np_csc_python(data, rows, cols, shape, dtype)
+
     def activate_numba_scorer(self):
         """
         Activate the Numba scorer for the BM25 index. This will apply the Numba JIT
@@ -1222,4 +1215,75 @@ class BM25:
 
         self._compute_relevance_from_scores = njit(
             _compute_relevance_from_scores_jit_ready
+        )
+
+    def activate_numba_csc(self):
+        """
+        Activate the Numba accelerator for CSC matrix construction. 
+        This will apply Numba JIT compilation to the CSC builder, significantly
+        speeding up index construction.
+        
+        This function requires the `numba` package.
+        """
+        try:
+            from numba import njit
+        except ImportError:
+            raise ImportError(
+                "Numba is not installed. Please install Numba to use the Numba accelerator with `pip install numba`."
+            )
+        # Assign the compiled function to the instance, replacing the static method
+        self._np_csc = njit(_np_csc_jit_ready)
+
+    def warmup_numba_scorer(self):
+        """
+        Warm up the Numba scorer by running a dummy scoring operation.
+        This will trigger the JIT compilation of the scoring function,
+        ensuring that subsequent scoring operations are faster.
+        """
+        if not hasattr(self, "_compute_relevance_from_scores"):
+            raise ValueError(
+                "The Numba scorer is not activated. Please call `activate_numba_scorer` first."
+            )
+    
+        # Create dummy data for warmup
+        dummy_data = np.array([1.0, 2.0, 3.0], dtype=self.dtype)
+        dummy_indices = np.array([0, 1, 2], dtype=self.int_dtype)
+        dummy_indptr = np.array([0, 3], dtype=self.int_dtype)
+        dummy_query_tokens_ids = np.array([0, 1, 2], dtype=self.int_dtype)
+        num_docs = 1
+
+        # Run the warmup scoring
+        _ = self._compute_relevance_from_scores(
+            data=dummy_data,
+            indptr=dummy_indptr,
+            indices=dummy_indices,
+            num_docs=num_docs,
+            query_tokens_ids=dummy_query_tokens_ids,
+            dtype=np.dtype(self.dtype),
+        )
+    
+    def warmup_numba_csc(self):
+        """
+        Warm up the Numba CSC builder by running a dummy CSC construction.
+        This will trigger the JIT compilation of the CSC builder function,
+        ensuring that subsequent CSC constructions are faster.
+        """
+        if not hasattr(self, "_np_csc"):
+            raise ValueError(
+                "The Numba CSC builder is not activated. Please call `activate_numba_csc` first."
+            )
+    
+        # Create dummy data for warmup
+        dummy_data = np.array([1.0, 2.0, 3.0], dtype=self.dtype)
+        dummy_rows = np.array([0, 1, 2], dtype=self.int_dtype)
+        dummy_cols = np.array([0, 0, 0], dtype=self.int_dtype)
+        shape = (3, 1)
+
+        # Run the warmup CSC construction
+        _ = self._np_csc(
+            data=dummy_data,
+            rows=dummy_rows,
+            cols=dummy_cols,
+            shape=shape,
+            dtype=self.dtype,
         )

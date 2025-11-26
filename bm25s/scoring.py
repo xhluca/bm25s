@@ -10,53 +10,16 @@ except ImportError:
     def tqdm(iterable, *args, **kwargs):
         return iterable
 
-def np_csc(data, rows, cols, shape, dtype=np.int32):
-    """
-    Builds a CSC matrix representation (data, indices, indptr) using pure NumPy.
-    Equivalent to scipy.sparse.csc_matrix((data, (rows, cols)), shape=shape)
-    
-    Parameters
-    ----------
-    data : np.ndarray
-        Flat array of data values.
-    rows : np.ndarray
-        Flat array of row indices.
-    cols : np.ndarray
-        Flat array of column indices.
-    shape : tuple
-        Shape of the matrix (n_rows, n_cols).
-    dtype : type
-        Data type for the indices and indptr.
-        
-    Returns
-    -------
-    data : np.ndarray
-        Sorted data array.
-    indices : np.ndarray
-        Sorted row indices.
-    indptr : np.ndarray
-        Index pointers for columns.
-    """
-    n_cols = shape[1]
-
-    # 1. Sort the data: Primary key = cols, Secondary key = rows
-    # We use lexsort ((secondary, primary))
-    sorter = np.lexsort((rows, cols))
-
-    # 2. Reorder arrays based on the sort
-    sorted_data = data[sorter]
-    sorted_indices = rows[sorter]
-    sorted_cols = cols[sorter]
-
-    # 3. Compute indptr
-    # bincount calculates the number of non-zeros in each column
-    col_counts = np.bincount(sorted_cols, minlength=n_cols)
-
-    # cumsum gives us the pointers (0, count[0], count[0]+count[1], ...)
-    indptr = np.zeros(n_cols + 1, dtype=dtype)
-    np.cumsum(col_counts, out=indptr[1:])
-
-    return sorted_data, sorted_indices, indptr
+try:
+    from numba import njit
+    HAS_NUMBA = True
+except ImportError:
+    HAS_NUMBA = False
+    # Dummy decorator to allow definition if numba is missing (code won't be used)
+    def njit(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
 
 def _calculate_doc_freqs(
     corpus_tokens, unique_tokens, show_progress=True, leave_progress=False
@@ -399,3 +362,71 @@ def _compute_relevance_from_scores_jit_ready(
             scores[indices[j]] += data[j]
 
     return scores
+
+
+def _np_csc_jit_ready(data, rows, cols, shape, dtype):
+    """
+    Numba-compilable core implementation of CSC construction.
+    Uses Counting Sort (linear time) instead of Argsort (linear-logarithmic time).
+    
+    This implementation assumes `rows` (doc_ids) are sorted in the input, which is 
+    standard for BM25 construction. It performs a stable sort on `cols` to strictly 
+    guarantee the final (col, row) sorted order required by CSC matrices.
+    """
+    n_cols = shape[1]
+    n_items = len(data)
+
+    # 1. Compute column counts (histogram)
+    col_counts = np.bincount(cols, minlength=n_cols)
+    
+    # 2. Compute indptr and initialize write pointers (heads)
+    # indptr: start/end of each column
+    # heads: current write position for each column (mutable)
+    indptr = np.zeros(n_cols + 1, dtype=np.int64)
+    heads = np.zeros(n_cols, dtype=np.int64)
+    
+    acc = 0
+    for i in range(n_cols):
+        heads[i] = acc
+        acc += col_counts[i]
+        indptr[i+1] = acc
+
+    # 3. Perform Counting Sort to fill data and indices
+    # Since 'heads' tracks the write position, we can fill the output arrays in one pass.
+    sorted_data = np.zeros_like(data)
+    sorted_indices = np.zeros_like(rows)
+
+    for i in range(n_items):
+        col = cols[i]
+        pos = heads[col]
+        sorted_data[pos] = data[i]
+        sorted_indices[pos] = rows[i]
+        heads[col] += 1
+    
+    sorted_data = sorted_data.astype(dtype)
+
+    return sorted_data, sorted_indices, indptr
+
+def _np_csc_python(data, rows, cols, shape, dtype):
+    """
+    Pure NumPy implementation of CSC construction.
+    """
+    n_cols = shape[1]
+
+    # 1. Compute indptr
+    col_counts = np.bincount(cols, minlength=n_cols)
+
+    indptr = np.zeros(n_cols + 1, dtype=np.int64)
+    np.cumsum(col_counts, out=indptr[1:])
+
+    # 2. Sort the data
+    packed_indices = (cols.astype(np.int64) << 32) | rows.astype(np.int64)
+    sorter = np.argsort(packed_indices)
+
+    # 3. Reorder arrays based on the sort
+    sorted_data = data[sorter]
+    sorted_indices = rows[sorter]
+
+    sorted_data = sorted_data.astype(dtype)
+    
+    return sorted_data, sorted_indices, indptr
