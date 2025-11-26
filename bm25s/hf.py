@@ -14,8 +14,8 @@ except ImportError:
         "Please install the huggingface_hub package to use the HuggingFace integrations for bm25s. You can install it via `pip install huggingface_hub`."
     )
 
-def _faketqdm(iterable, *args, **kwargs):
-    return iterable
+def _faketqdm(*args, **kwargs):
+    return args[0] if len(args) > 0 else None
 try:
     if os.environ.get("DISABLE_TQDM", False):
         tqdm = _faketqdm
