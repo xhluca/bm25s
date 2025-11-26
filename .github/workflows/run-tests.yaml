@@ -32,16 +32,20 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r tests/requirements-core.txt
         pip install coverage
-
+    
     - name: Run core tests with coverage
       run: |
-        # python -m coverage run --source=bm25s -m unittest discover tests/core
-        python -X faulthandler -m coverage run --source=bm25s -m unittest discover tests/core
+        python -m coverage run --source=bm25s -m unittest discover tests/core
+        # python -X faulthandler -m coverage run --source=bm25s -m unittest discover tests/core
         COVERAGE_OUTPUT=$(python -m coverage report --omit="*/tests/*,*/numba/*")
         echo "$COVERAGE_OUTPUT"
         echo "Coverage percentage:"
         echo "$COVERAGE_OUTPUT" | tail -1 | awk '{print "Total Coverage: " $4}'
     
+    - name: Install Numba
+      run: |
+        pip install "numba>=0.62.0"
+
     - name: Run numba tests
       run: |
         python -m unittest tests/numba/test_*.py
