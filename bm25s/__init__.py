@@ -237,7 +237,8 @@ class BM25:
         
         NUMBA_IS_DISABLED = os.environ.get("NUMBA_DISABLE_JIT") in [None, False]
         if auto_compile and self.backend == "numba" and not NUMBA_IS_DISABLED:
-            self.compile()
+            # by default, we don't want to warm up the Numba functions
+            self.compile(activate_numba=True, warmup=False)
 
     @staticmethod
     def _infer_corpus_object(corpus):
@@ -1251,7 +1252,7 @@ class BM25:
         """
         return _np_csc_python(data, rows, cols, shape)
 
-    def compile(self, activate_numba=True, warmup=True):
+    def compile(self, activate_numba=True, warmup=False):
         """
         Compile the Numba functions for the BM25 index. This will apply the Numba JIT
         compilation to the `_compute_relevance_from_scores` function and the CSC builder,
