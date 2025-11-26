@@ -416,11 +416,10 @@ class BM25:
                 rows=doc_idx,
                 cols=vocab_idx,
                 shape=(n_docs, n_vocab),
-                dtype=self.dtype,
             )
+            data = data.astype(self.dtype)
         else:
             raise ValueError(f"Invalid csc_backend value: {self.csc_backend}. Choose from 'scipy', 'numpy'.")
-
 
         scores = {
             "data": data,
@@ -1239,12 +1238,12 @@ class BM25:
         return bm25_obj
 
     @staticmethod
-    def _np_csc(data, rows, cols, shape, dtype):
+    def _np_csc(data, rows, cols, shape):
         """
         Default Hybrid CSC builder. Uses pure Python/NumPy by default.
         Can be swapped with a Numba version via `activate_numba_csc`.
         """
-        return _np_csc_python(data, rows, cols, shape, dtype)
+        return _np_csc_python(data, rows, cols, shape)
 
     def compile(self):
         """
@@ -1354,5 +1353,4 @@ class BM25:
             rows=dummy_rows,
             cols=dummy_cols,
             shape=shape,
-            dtype=self.dtype,
         )

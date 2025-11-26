@@ -364,7 +364,7 @@ def _compute_relevance_from_scores_jit_ready(
     return scores
 
 
-def _np_csc_jit_ready(data, rows, cols, shape, dtype):
+def _np_csc_jit_ready(data, rows, cols, shape):
     """
     Numba-compilable core implementation of CSC construction.
     Uses Counting Sort (linear time) instead of Argsort (linear-logarithmic time).
@@ -403,11 +403,9 @@ def _np_csc_jit_ready(data, rows, cols, shape, dtype):
         sorted_indices[pos] = rows[i]
         heads[col] += 1
     
-    sorted_data = sorted_data.astype(dtype)
-
     return sorted_data, sorted_indices, indptr
 
-def _np_csc_python(data, rows, cols, shape, dtype):
+def _np_csc_python(data, rows, cols, shape):
     """
     Pure NumPy implementation of CSC construction.
     """
@@ -426,7 +424,5 @@ def _np_csc_python(data, rows, cols, shape, dtype):
     # 3. Reorder arrays based on the sort
     sorted_data = data[sorter]
     sorted_indices = rows[sorter]
-
-    sorted_data = sorted_data.astype(dtype)
     
     return sorted_data, sorted_indices, indptr
