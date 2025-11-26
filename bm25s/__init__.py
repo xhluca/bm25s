@@ -1265,7 +1265,7 @@ class BM25:
         self.activate_numba_csc()
         self.activate_numba_scorer()
         self.warmup_numba_csc()
-        self.warmup_numba_scorer()
+        # self.warmup_numba_scorer()
     
     def activate_numba_scorer(self):
         """
@@ -1335,7 +1335,7 @@ class BM25:
         num_docs = 1
 
         # Run the warmup scoring
-        scores = self._compute_relevance_from_scores(
+        return self._compute_relevance_from_scores(
             data=dummy_data,
             indptr=dummy_indptr,
             indices=dummy_indices,
