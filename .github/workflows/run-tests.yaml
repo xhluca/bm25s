@@ -40,14 +40,15 @@ jobs:
         pip install coverage
     
     - name: Run core tests with coverage
-      # 2. Added --concurrency=thread to explicitly handle Python threads
       run: |
-        python -m coverage run --concurrency=thread --source=bm25s -m unittest discover tests/core
+        # Added --timid to force pure-Python tracing and avoid C-extension crashes
+        python -m coverage run --timid --source=bm25s -m unittest discover tests/core
+        
         COVERAGE_OUTPUT=$(python -m coverage report --omit="*/tests/*,*/numba/*")
         echo "$COVERAGE_OUTPUT"
         echo "Coverage percentage:"
         echo "$COVERAGE_OUTPUT" | tail -1 | awk '{print "Total Coverage: " $4}'
-    
+   
     - name: Install Numba
       run: |
         pip install "numba>=0.62.0"
