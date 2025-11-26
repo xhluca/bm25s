@@ -235,7 +235,8 @@ class BM25:
                 "scipy is not installed. Please install scipy to use the scipy csc_backend."
             )
         
-        if auto_compile and self.backend == "numba" and os.environ.get("NUMBA_DISABLE_JIT") in [None, False]:
+        NUMBA_IS_DISABLED = os.environ.get("NUMBA_DISABLE_JIT") in [None, False]
+        if auto_compile and self.backend == "numba" and not NUMBA_IS_DISABLED:
             self.compile()
 
     @staticmethod
@@ -1245,7 +1246,7 @@ class BM25:
         """
         return _np_csc_python(data, rows, cols, shape)
 
-    def compile(self):
+    def compile(self, activate_numba=True, warmup=True):
         """
         Compile the Numba functions for the BM25 index. This will apply the Numba JIT
         compilation to the `_compute_relevance_from_scores` function and the CSC builder,
@@ -1262,10 +1263,12 @@ class BM25:
             raise ImportError(
                 "Numba is not installed. Please install Numba to compile the BM25 index with `pip install numba`."
             )
-        self.activate_numba_csc()
-        self.activate_numba_scorer()
-        self.warmup_numba_csc()
-        self.warmup_numba_scorer()
+        if activate_numba:
+            self.activate_numba_csc()
+            self.activate_numba_scorer()
+        if warmup:
+            self.warmup_numba_csc()
+            self.warmup_numba_scorer()
     
     def activate_numba_scorer(self):
         """
