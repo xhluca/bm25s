@@ -1123,7 +1123,7 @@ class BM25:
         mmap=False,
         allow_pickle=False,
         load_vocab=True,
-        auto_compile=True,
+        override_params: dict = None,
     ):
         """
         Load a BM25S index that was saved using the `save` method.
@@ -1171,10 +1171,11 @@ class BM25:
         load_vocab : bool
             If True, the vocab dictionary will be loaded from the `vocab_name` file. If False, the vocab dictionary
             will not be loaded, and the `vocab_dict` attribute of the BM25 object will be set to None.
-
-        auto_compile : bool
-            If True, it will automatically compile the JIT functions when using the numba backend.
-            This may take some time during the first run, but will speed up subsequent runs.
+        
+        override_params : dict
+            A dictionary of parameters to override the loaded parameters. This can be used to change
+            the parameters of the BM25 object after loading it. For example, you can change auto_compile from
+            False to True after loading the object.
         """
         if not isinstance(mmap, bool):
             raise ValueError("`mmap` must be a boolean")
@@ -1186,6 +1187,9 @@ class BM25:
         params_path = save_dir / params_name
         with open(params_path, "r") as f:
             params: dict = json_functions.loads(f.read())
+        
+        if override_params is not None:
+            params.update(override_params)
 
         # Load the vocab dictionary
         if load_vocab:
