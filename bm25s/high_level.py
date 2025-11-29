@@ -101,9 +101,8 @@ class BM25Search:
             show_progress=self.show_progress,
             leave_progress=self.leave_progress,
             return_as="tuple",
+            allow_empty=False,
         )
-        # DEBUG
-        print(f"DEBUG: tokenized_queries.ids: {tokenized_queries.ids}")
         
         # Handle empty queries explicitly to avoid issues with Numba backend
         # We filter out queries that result in no tokens

@@ -69,7 +69,7 @@ jobs:
     - name: Run numba tests
       run: |
         python -X faulthandler -m unittest discover tests/numba
-  
+
   test-high-level:
     runs-on: ubuntu-latest
     steps:
@@ -84,7 +84,7 @@ jobs:
         pip install -r tests/requirements-core.txt
     - name: Run high-level tests
       run: |
-        python -X faulthandler python -m unittest discover tests/high_level
+        python -m unittest discover tests/high_level
 
   test-comparison:
     runs-on: ubuntu-latest
