@@ -1124,6 +1124,7 @@ class BM25:
         allow_pickle=False,
         load_vocab=True,
         override_params: dict = None,
+        **kwargs,
     ):
         """
         Load a BM25S index that was saved using the `save` method.
@@ -1176,6 +1177,9 @@ class BM25:
             A dictionary of parameters to override the loaded parameters. This can be used to change
             the parameters of the BM25 object after loading it. For example, you can change auto_compile from
             False to True after loading the object.
+        
+        **kwargs
+            Additional arguments are treated as overrides for the parameters.
         """
         if not isinstance(mmap, bool):
             raise ValueError("`mmap` must be a boolean")
@@ -1190,6 +1194,9 @@ class BM25:
         
         if override_params is not None:
             params.update(override_params)
+        
+        if kwargs:
+            params.update(kwargs)
 
         # Load the vocab dictionary
         if load_vocab:
