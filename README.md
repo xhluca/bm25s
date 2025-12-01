@@ -192,6 +192,9 @@ bm25 search --index=my_index "what is machine learning?"
 
 # Return more results
 bm25 search --index=my_index "your query here" -k 20
+
+# Save results to a JSON file
+bm25 search --index=my_index "your query here" --save results.json
 ```
 
 ### Example Workflow

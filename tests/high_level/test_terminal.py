@@ -429,6 +429,103 @@ class TestTerminalCLIEdgeCases(unittest.TestCase):
         # Should have "..." for truncated content
         self.assertIn("...", output)
 
+    def test_save_results_to_json(self):
+        """Test saving search results to a JSON file."""
+        # Create a corpus file
+        corpus_file = os.path.join(self.tmpdirname, "corpus.txt")
+        with open(corpus_file, "w", encoding="utf-8") as f:
+            f.write("hello world\n")
+            f.write("this is a test\n")
+            f.write("bm25s is fast\n")
+        
+        # Index
+        index_args = Namespace(
+            file=corpus_file,
+            output=self.index_dir,
+            column=None
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(index_args)
+        finally:
+            sys.stdout = old_stdout
+        
+        # Search with save option
+        results_file = os.path.join(self.tmpdirname, "results.json")
+        search_args = Namespace(
+            index=self.index_dir,
+            query="hello",
+            top_k=3,
+            save=results_file
+        )
+        
+        sys.stdout = StringIO()
+        
+        try:
+            search_command(search_args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check that file was created
+        self.assertTrue(os.path.exists(results_file))
+        
+        # Check that output mentions the file
+        self.assertIn("Results saved to", output)
+        
+        # Check file contents
+        with open(results_file, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
+        
+        self.assertEqual(saved_data["query"], "hello")
+        self.assertEqual(saved_data["total_documents"], 3)
+        self.assertIn("results", saved_data)
+        self.assertEqual(len(saved_data["results"]), 3)
+        
+        # Check result structure
+        first_result = saved_data["results"][0]
+        self.assertIn("id", first_result)
+        self.assertIn("score", first_result)
+        self.assertIn("document", first_result)
+
+    def test_save_results_via_main(self):
+        """Test saving results using the main() function."""
+        # Create a corpus file
+        corpus_file = os.path.join(self.tmpdirname, "corpus.txt")
+        with open(corpus_file, "w", encoding="utf-8") as f:
+            f.write("machine learning is AI\n")
+            f.write("deep learning uses neural networks\n")
+        
+        # Index via main
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", corpus_file, "-o", self.index_dir])
+        finally:
+            sys.stdout = old_stdout
+        
+        # Search with save via main
+        results_file = os.path.join(self.tmpdirname, "output.json")
+        sys.stdout = StringIO()
+        
+        try:
+            main(["search", "--index", self.index_dir, "machine learning", "--save", results_file])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check file was created and has valid JSON
+        self.assertTrue(os.path.exists(results_file))
+        with open(results_file, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
+        
+        self.assertEqual(saved_data["query"], "machine learning")
+        self.assertGreater(len(saved_data["results"]), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

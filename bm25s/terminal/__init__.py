@@ -11,6 +11,7 @@ Example usage:
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -120,6 +121,21 @@ def search_command(args):
     
     results = search_obj.search([query], k=actual_k)
     
+    # Save results to file if requested
+    save_path = getattr(args, 'save', None)
+    if save_path:
+        output_data = {
+            "query": query,
+            "num_results": len(results[0]),
+            "total_documents": num_docs,
+            "results": results[0]
+        }
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
+        print(f"Results saved to '{save_path}'")
+    
     # Print results
     print(f"\nSearch results for: \"{query}\"\n")
     print("-" * 60)
@@ -194,6 +210,12 @@ def create_parser():
         type=int,
         default=10,
         help="Number of results to return (default: 10)",
+    )
+    search_parser.add_argument(
+        "-s", "--save",
+        type=str,
+        default=None,
+        help="Save results to a JSON file at the specified path",
     )
     
     return parser

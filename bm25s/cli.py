@@ -60,6 +60,12 @@ def main():
         default=10,
         help="Number of results to return (default: 10)",
     )
+    search_parser.add_argument(
+        "-s", "--save",
+        type=str,
+        default=None,
+        help="Save results to a JSON file at the specified path",
+    )
 
     args = parser.parse_args()
 
