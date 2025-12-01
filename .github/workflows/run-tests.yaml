@@ -82,9 +82,10 @@ jobs:
     - name: Install high-level dependencies
       run: |
         pip install -r tests/requirements-core.txt
+        pip install numba
     - name: Run high-level tests
       run: |
-        python -m unittest discover tests/high_level
+        python -X faulthandler -m unittest discover tests/high_level
 
   test-comparison:
     runs-on: ubuntu-latest
