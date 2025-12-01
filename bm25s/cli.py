@@ -1,7 +1,6 @@
 
 import argparse
 import sys
-from bm25s.mcp import main as mcp_main
 
 def main():
     parser = argparse.ArgumentParser(description="BM25S CLI")
@@ -21,9 +20,9 @@ def main():
     if args.command == "mcp":
         if args.mcp_command == "launch":
             try:
+                from .mcp.server import main as mcp_main
                 mcp_main(index_dir=args.index_dir, port=args.port)
             except ImportError:
-                print("Error: 'mcp' package is not installed. Please install it with 'pip install bm25s[mcp]'.", file=sys.stderr)
                 sys.exit(1)
             except Exception as e:
                 print(f"Error launching MCP server: {e}", file=sys.stderr)
