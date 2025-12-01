@@ -12,8 +12,8 @@ def main():
 
     # MCP Launch
     launch_parser = mcp_subparsers.add_parser("launch", help="Launch the MCP server")
-    launch_parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
-    launch_parser.add_argument("--index-dir", required=True, help="Path to the BM25S index directory")
+    launch_parser.add_argument("-p", "--port", type=int, default=8000, help="Port to run the server on")
+    launch_parser.add_argument("-d", "--index-dir", required=True, help="Path to the BM25S index directory")
 
     # Index Subcommand
     index_parser = subparsers.add_parser(
@@ -29,13 +29,19 @@ def main():
         "-o", "--output",
         type=str,
         default=None,
-        help="Output directory for the index (default: <filename>_index)",
+        help="Output directory/name for the index (default: <filename>_index)",
     )
     index_parser.add_argument(
         "-c", "--column",
         type=str,
         default=None,
         help="Column name for document text (for CSV/JSON/JSONL files)",
+    )
+    index_parser.add_argument(
+        "-u", "--user",
+        action="store_true",
+        default=False,
+        help="Save index to user directory (~/.bm25s/indices/)",
     )
 
     # Search Subcommand
@@ -44,10 +50,10 @@ def main():
         help="Search an index with a query",
     )
     search_parser.add_argument(
-        "--index",
+        "-i", "--index",
         type=str,
-        required=True,
-        help="Path to the index directory",
+        default=None,
+        help="Path to the index directory (or index name if using -u)",
     )
     search_parser.add_argument(
         "query",
@@ -65,6 +71,12 @@ def main():
         type=str,
         default=None,
         help="Save results to a JSON file at the specified path",
+    )
+    search_parser.add_argument(
+        "-u", "--user",
+        action="store_true",
+        default=False,
+        help="Use index from user directory (~/.bm25s/indices/). Shows picker if -i not specified.",
     )
 
     args = parser.parse_args()

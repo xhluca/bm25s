@@ -8,7 +8,10 @@ import sys
 from io import StringIO
 from argparse import Namespace
 
-from bm25s.terminal import index_command, search_command, create_parser, main
+from bm25s.terminal import (
+    index_command, search_command, create_parser, main,
+    get_user_indices_dir, list_user_indices
+)
 
 
 class TestTerminalCLI(unittest.TestCase):
@@ -525,6 +528,118 @@ class TestTerminalCLIEdgeCases(unittest.TestCase):
         
         self.assertEqual(saved_data["query"], "machine learning")
         self.assertGreater(len(saved_data["results"]), 0)
+
+
+class TestTerminalCLIUserDirectory(unittest.TestCase):
+    """Test user directory functionality for the terminal CLI."""
+    
+    def setUp(self):
+        self.tmpdirname = tempfile.mkdtemp()
+        # Mock the user indices directory
+        self.original_home = os.environ.get('HOME')
+        os.environ['HOME'] = self.tmpdirname
+        
+        # Create test corpus
+        self.corpus_file = os.path.join(self.tmpdirname, "corpus.txt")
+        with open(self.corpus_file, "w", encoding="utf-8") as f:
+            f.write("hello world\n")
+            f.write("this is a test\n")
+            f.write("bm25s is fast\n")
+
+    def tearDown(self):
+        if self.original_home:
+            os.environ['HOME'] = self.original_home
+        shutil.rmtree(self.tmpdirname)
+
+    def test_get_user_indices_dir(self):
+        """Test that user indices directory path is correct."""
+        expected = os.path.join(self.tmpdirname, ".bm25s", "indices")
+        self.assertEqual(str(get_user_indices_dir()), expected)
+
+    def test_list_user_indices_empty(self):
+        """Test listing indices when directory doesn't exist."""
+        indices = list_user_indices()
+        self.assertEqual(indices, [])
+
+    def test_index_with_user_flag(self):
+        """Test indexing with -u flag saves to user directory."""
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", self.corpus_file, "-u", "-o", "my_test_index"])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check that index was created in user directory
+        user_index = os.path.join(self.tmpdirname, ".bm25s", "indices", "my_test_index")
+        self.assertTrue(os.path.exists(user_index))
+        self.assertTrue(os.path.exists(os.path.join(user_index, "params.index.json")))
+        
+        # Check that list_user_indices returns it
+        indices = list_user_indices()
+        self.assertIn("my_test_index", indices)
+
+    def test_search_with_user_flag_and_index_name(self):
+        """Test searching with -u and -i flags."""
+        # First index
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", self.corpus_file, "-u", "-o", "search_test_index"])
+        finally:
+            sys.stdout = old_stdout
+        
+        # Now search using -u and -i
+        sys.stdout = StringIO()
+        
+        try:
+            main(["search", "-u", "-i", "search_test_index", "hello"])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        self.assertIn("Search results for:", output)
+        self.assertIn("hello world", output)
+
+    def test_parser_shorthand_flags(self):
+        """Test that shorthand flags work correctly."""
+        parser = create_parser()
+        
+        # Test -i shorthand for --index
+        args = parser.parse_args(["search", "-i", "myindex", "query"])
+        self.assertEqual(args.index, "myindex")
+        
+        # Test -u shorthand for --user in search
+        args = parser.parse_args(["search", "-u", "-i", "myindex", "query"])
+        self.assertTrue(args.user)
+        
+        # Test -u shorthand for --user in index
+        args = parser.parse_args(["index", "file.txt", "-u"])
+        self.assertTrue(args.user)
+        
+        # Test combined flags
+        args = parser.parse_args(["search", "-u", "-i", "idx", "-k", "5", "query"])
+        self.assertTrue(args.user)
+        self.assertEqual(args.index, "idx")
+        self.assertEqual(args.top_k, 5)
+
+    def test_index_user_default_name(self):
+        """Test that -u without -o uses default name."""
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", self.corpus_file, "-u"])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Default name should be corpus_index
+        user_index = os.path.join(self.tmpdirname, ".bm25s", "indices", "corpus_index")
+        self.assertTrue(os.path.exists(user_index))
 
 
 if __name__ == "__main__":

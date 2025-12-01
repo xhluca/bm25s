@@ -17,6 +17,7 @@ extras_require = {
     "indexing": ["scipy"],
     "evaluation": ["pytrec_eval"],
     "mcp": ["mcp"],
+    "cli": ["rich"],
 }
 # Dynamically create the 'full' extra by combining all other extras
 extras_require["full"] = sum(extras_require.values(), [])
