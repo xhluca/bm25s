@@ -158,6 +158,55 @@ for result in results[0]:
 
 The `load` function handles file reading, while `index` handles tokenization, indexing, and provides a simple search interface.
 
+## Command-Line Interface
+
+`bm25s` provides a terminal-based CLI for quick indexing and searching without writing Python code.
+
+### Indexing Documents
+
+Create an index from a CSV, TXT, JSON, or JSONL file:
+
+```bash
+# Index a CSV file (uses first column by default)
+bm25 index documents.csv -o my_index
+
+# Index with a specific column
+bm25 index documents.csv -o my_index --column text
+
+# Index a text file (one document per line)
+bm25 index documents.txt -o my_index
+
+# Index a JSONL file
+bm25 index documents.jsonl -o my_index --column content
+```
+
+If you don't specify an output directory with `-o`, the index will be saved to `<filename>_index`.
+
+### Searching
+
+Search an existing index with a query:
+
+```bash
+# Basic search (returns top 10 results)
+bm25 search --index=my_index "what is machine learning?"
+
+# Return more results
+bm25 search --index=my_index "your query here" -k 20
+```
+
+### Example Workflow
+
+```bash
+# 1. Create a simple text file with documents
+echo -e "Machine learning is a subset of AI\nDeep learning uses neural networks\nNatural language processing handles text" > docs.txt
+
+# 2. Index the documents
+bm25 index docs.txt -o my_search_index
+
+# 3. Search the index
+bm25 search --index=my_search_index "what is AI?"
+```
+
 ## Flexibility
 
 `bm25s` provides a flexible API that allows you to customize the BM25 model and the tokenization process. Here are some of the options you can use:
