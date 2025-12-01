@@ -1,0 +1,647 @@
+import unittest
+import tempfile
+import shutil
+import os
+import json
+import csv
+import sys
+from io import StringIO
+from argparse import Namespace
+
+from bm25s.terminal import (
+    index_command, search_command, create_parser, main,
+    get_user_indices_dir, list_user_indices
+)
+
+
+class TestTerminalCLI(unittest.TestCase):
+    def setUp(self):
+        self.tmpdirname = tempfile.mkdtemp()
+        self.data_dir = self.tmpdirname
+        self.index_dir = os.path.join(self.tmpdirname, "test_index")
+        
+        # Create dummy data
+        self.corpus_txt = [
+            "hello world",
+            "this is a test",
+            "bm25s is fast"
+        ]
+        
+        self.corpus_dicts = [
+            {"id": 1, "text": "hello world"},
+            {"id": 2, "text": "this is a test"},
+            {"id": 3, "text": "bm25s is fast"}
+        ]
+        
+        # Write files
+        self.txt_path = os.path.join(self.data_dir, "corpus.txt")
+        with open(self.txt_path, "w", encoding="utf-8") as f:
+            for line in self.corpus_txt:
+                f.write(line + "\n")
+                
+        self.csv_path = os.path.join(self.data_dir, "corpus.csv")
+        with open(self.csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["id", "text"])
+            writer.writeheader()
+            for doc in self.corpus_dicts:
+                writer.writerow(doc)
+                
+        self.jsonl_path = os.path.join(self.data_dir, "corpus.jsonl")
+        with open(self.jsonl_path, "w", encoding="utf-8") as f:
+            for doc in self.corpus_dicts:
+                f.write(json.dumps(doc) + "\n")
+                
+        self.json_path = os.path.join(self.data_dir, "corpus.json")
+        with open(self.json_path, "w", encoding="utf-8") as f:
+            json.dump(self.corpus_dicts, f)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdirname)
+
+    def test_create_parser(self):
+        """Test that the parser is created correctly."""
+        parser = create_parser()
+        self.assertIsNotNone(parser)
+        
+        # Test index subcommand parsing
+        args = parser.parse_args(["index", "test.csv", "-o", "output_dir"])
+        self.assertEqual(args.command, "index")
+        self.assertEqual(args.file, "test.csv")
+        self.assertEqual(args.output, "output_dir")
+        
+        # Test search subcommand parsing
+        args = parser.parse_args(["search", "--index=myindex", "query text"])
+        self.assertEqual(args.command, "search")
+        self.assertEqual(args.index, "myindex")
+        self.assertEqual(args.query, "query text")
+
+    def test_index_txt_file(self):
+        """Test indexing a TXT file."""
+        args = Namespace(
+            file=self.txt_path,
+            output=self.index_dir,
+            column=None
+        )
+        
+        # Capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check that index was created
+        self.assertTrue(os.path.exists(self.index_dir))
+        self.assertTrue(os.path.exists(os.path.join(self.index_dir, "params.index.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.index_dir, "corpus.jsonl")))
+        self.assertTrue(os.path.exists(os.path.join(self.index_dir, "vocab.tokenizer.json")))
+        
+        # Check output messages
+        self.assertIn("Loaded 3 documents", output)
+        self.assertIn("Index saved successfully", output)
+
+    def test_index_csv_file(self):
+        """Test indexing a CSV file with column specification."""
+        args = Namespace(
+            file=self.csv_path,
+            output=self.index_dir,
+            column="text"
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        self.assertTrue(os.path.exists(self.index_dir))
+        self.assertIn("Loaded 3 documents", output)
+
+    def test_index_jsonl_file(self):
+        """Test indexing a JSONL file."""
+        args = Namespace(
+            file=self.jsonl_path,
+            output=self.index_dir,
+            column="text"
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        self.assertTrue(os.path.exists(self.index_dir))
+        self.assertIn("Loaded 3 documents", output)
+
+    def test_index_json_file(self):
+        """Test indexing a JSON file."""
+        args = Namespace(
+            file=self.json_path,
+            output=self.index_dir,
+            column="text"
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        self.assertTrue(os.path.exists(self.index_dir))
+        self.assertIn("Loaded 3 documents", output)
+
+    def test_index_default_output(self):
+        """Test that default output directory is created correctly."""
+        args = Namespace(
+            file=self.txt_path,
+            output=None,  # Default output
+            column=None
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        old_cwd = os.getcwd()
+        os.chdir(self.tmpdirname)
+        
+        try:
+            index_command(args)
+        finally:
+            sys.stdout = old_stdout
+            os.chdir(old_cwd)
+        
+        # Default output should be corpus_index
+        default_index = os.path.join(self.tmpdirname, "corpus_index")
+        self.assertTrue(os.path.exists(default_index))
+        
+        # Clean up
+        shutil.rmtree(default_index)
+
+    def test_index_file_not_found(self):
+        """Test error handling for missing input file."""
+        args = Namespace(
+            file="/nonexistent/path/to/file.txt",
+            output=self.index_dir,
+            column=None
+        )
+        
+        with self.assertRaises(SystemExit) as context:
+            index_command(args)
+        
+        self.assertEqual(context.exception.code, 1)
+
+    def test_search_command(self):
+        """Test searching an index."""
+        # First, create an index
+        index_args = Namespace(
+            file=self.txt_path,
+            output=self.index_dir,
+            column=None
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(index_args)
+        finally:
+            sys.stdout = old_stdout
+        
+        # Now search
+        search_args = Namespace(
+            index=self.index_dir,
+            query="hello world",
+            top_k=10
+        )
+        
+        sys.stdout = StringIO()
+        
+        try:
+            search_command(search_args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check output
+        self.assertIn("Search results for:", output)
+        self.assertIn("hello world", output)
+        self.assertIn("score:", output)
+
+    def test_search_with_top_k(self):
+        """Test searching with custom top-k value."""
+        # First, create an index
+        index_args = Namespace(
+            file=self.txt_path,
+            output=self.index_dir,
+            column=None
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(index_args)
+        finally:
+            sys.stdout = old_stdout
+        
+        # Search with k=2
+        search_args = Namespace(
+            index=self.index_dir,
+            query="test",
+            top_k=2
+        )
+        
+        sys.stdout = StringIO()
+        
+        try:
+            search_command(search_args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        self.assertIn("Showing top 2 of 3 documents", output)
+
+    def test_search_index_not_found(self):
+        """Test error handling for missing index directory."""
+        args = Namespace(
+            index="/nonexistent/path/to/index",
+            query="test query",
+            top_k=10
+        )
+        
+        with self.assertRaises(SystemExit) as context:
+            search_command(args)
+        
+        self.assertEqual(context.exception.code, 1)
+
+    def test_full_workflow_via_main(self):
+        """Test the full workflow using the main() function."""
+        # Index
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", self.txt_path, "-o", self.index_dir])
+        finally:
+            sys.stdout = old_stdout
+        
+        self.assertTrue(os.path.exists(self.index_dir))
+        
+        # Search
+        sys.stdout = StringIO()
+        
+        try:
+            main(["search", "--index", self.index_dir, "fast"])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        self.assertIn("fast", output)
+        self.assertIn("bm25s is fast", output)
+
+    def test_main_no_command(self):
+        """Test main with no command prints help."""
+        with self.assertRaises(SystemExit) as context:
+            main([])
+        
+        self.assertEqual(context.exception.code, 1)
+
+    def test_search_relevance_ranking(self):
+        """Test that search returns results in relevance order."""
+        # Create an index
+        index_args = Namespace(
+            file=self.txt_path,
+            output=self.index_dir,
+            column=None
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(index_args)
+        finally:
+            sys.stdout = old_stdout
+        
+        # Search for "fast" - should rank "bm25s is fast" first
+        search_args = Namespace(
+            index=self.index_dir,
+            query="fast",
+            top_k=3
+        )
+        
+        sys.stdout = StringIO()
+        
+        try:
+            search_command(search_args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # The first result should contain "fast"
+        lines = output.split("\n")
+        first_result_idx = None
+        for i, line in enumerate(lines):
+            if "[1]" in line:
+                first_result_idx = i
+                break
+        
+        self.assertIsNotNone(first_result_idx)
+        # Check that "fast" appears in the document after [1]
+        first_doc_line = lines[first_result_idx + 1] if first_result_idx + 1 < len(lines) else ""
+        self.assertIn("fast", first_doc_line)
+
+
+class TestTerminalCLIEdgeCases(unittest.TestCase):
+    """Test edge cases for the terminal CLI."""
+    
+    def setUp(self):
+        self.tmpdirname = tempfile.mkdtemp()
+        self.index_dir = os.path.join(self.tmpdirname, "test_index")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdirname)
+
+    def test_empty_file(self):
+        """Test handling of empty input file."""
+        empty_file = os.path.join(self.tmpdirname, "empty.txt")
+        with open(empty_file, "w", encoding="utf-8") as f:
+            f.write("")
+        
+        args = Namespace(
+            file=empty_file,
+            output=self.index_dir,
+            column=None
+        )
+        
+        with self.assertRaises(SystemExit) as context:
+            index_command(args)
+        
+        self.assertEqual(context.exception.code, 1)
+
+    def test_long_document_truncation(self):
+        """Test that long documents are truncated in search output."""
+        # Create a file with a very long document
+        long_doc = "word " * 100  # 500 characters
+        long_file = os.path.join(self.tmpdirname, "long.txt")
+        with open(long_file, "w", encoding="utf-8") as f:
+            f.write(long_doc + "\n")
+            f.write("short doc\n")
+        
+        args = Namespace(
+            file=long_file,
+            output=self.index_dir,
+            column=None
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(args)
+        finally:
+            sys.stdout = old_stdout
+        
+        # Search and check truncation
+        search_args = Namespace(
+            index=self.index_dir,
+            query="word",
+            top_k=2
+        )
+        
+        sys.stdout = StringIO()
+        
+        try:
+            search_command(search_args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Should have "..." for truncated content
+        self.assertIn("...", output)
+
+    def test_save_results_to_json(self):
+        """Test saving search results to a JSON file."""
+        # Create a corpus file
+        corpus_file = os.path.join(self.tmpdirname, "corpus.txt")
+        with open(corpus_file, "w", encoding="utf-8") as f:
+            f.write("hello world\n")
+            f.write("this is a test\n")
+            f.write("bm25s is fast\n")
+        
+        # Index
+        index_args = Namespace(
+            file=corpus_file,
+            output=self.index_dir,
+            column=None
+        )
+        
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            index_command(index_args)
+        finally:
+            sys.stdout = old_stdout
+        
+        # Search with save option
+        results_file = os.path.join(self.tmpdirname, "results.json")
+        search_args = Namespace(
+            index=self.index_dir,
+            query="hello",
+            top_k=3,
+            save=results_file
+        )
+        
+        sys.stdout = StringIO()
+        
+        try:
+            search_command(search_args)
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check that file was created
+        self.assertTrue(os.path.exists(results_file))
+        
+        # Check that output mentions the file
+        self.assertIn("Results saved to", output)
+        
+        # Check file contents
+        with open(results_file, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
+        
+        self.assertEqual(saved_data["query"], "hello")
+        self.assertEqual(saved_data["total_documents"], 3)
+        self.assertIn("results", saved_data)
+        self.assertEqual(len(saved_data["results"]), 3)
+        
+        # Check result structure
+        first_result = saved_data["results"][0]
+        self.assertIn("id", first_result)
+        self.assertIn("score", first_result)
+        self.assertIn("document", first_result)
+
+    def test_save_results_via_main(self):
+        """Test saving results using the main() function."""
+        # Create a corpus file
+        corpus_file = os.path.join(self.tmpdirname, "corpus.txt")
+        with open(corpus_file, "w", encoding="utf-8") as f:
+            f.write("machine learning is AI\n")
+            f.write("deep learning uses neural networks\n")
+        
+        # Index via main
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", corpus_file, "-o", self.index_dir])
+        finally:
+            sys.stdout = old_stdout
+        
+        # Search with save via main
+        results_file = os.path.join(self.tmpdirname, "output.json")
+        sys.stdout = StringIO()
+        
+        try:
+            main(["search", "--index", self.index_dir, "machine learning", "--save", results_file])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check file was created and has valid JSON
+        self.assertTrue(os.path.exists(results_file))
+        with open(results_file, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
+        
+        self.assertEqual(saved_data["query"], "machine learning")
+        self.assertGreater(len(saved_data["results"]), 0)
+
+
+class TestTerminalCLIUserDirectory(unittest.TestCase):
+    """Test user directory functionality for the terminal CLI."""
+    
+    def setUp(self):
+        self.tmpdirname = tempfile.mkdtemp()
+        # Mock the user indices directory
+        self.original_home = os.environ.get('HOME')
+        os.environ['HOME'] = self.tmpdirname
+        
+        # Create test corpus
+        self.corpus_file = os.path.join(self.tmpdirname, "corpus.txt")
+        with open(self.corpus_file, "w", encoding="utf-8") as f:
+            f.write("hello world\n")
+            f.write("this is a test\n")
+            f.write("bm25s is fast\n")
+
+    def tearDown(self):
+        if self.original_home:
+            os.environ['HOME'] = self.original_home
+        shutil.rmtree(self.tmpdirname)
+
+    def test_get_user_indices_dir(self):
+        """Test that user indices directory path is correct."""
+        expected = os.path.join(self.tmpdirname, ".bm25s", "indices")
+        self.assertEqual(str(get_user_indices_dir()), expected)
+
+    def test_list_user_indices_empty(self):
+        """Test listing indices when directory doesn't exist."""
+        indices = list_user_indices()
+        self.assertEqual(indices, [])
+
+    def test_index_with_user_flag(self):
+        """Test indexing with -u flag saves to user directory."""
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", self.corpus_file, "-u", "-o", "my_test_index"])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Check that index was created in user directory
+        user_index = os.path.join(self.tmpdirname, ".bm25s", "indices", "my_test_index")
+        self.assertTrue(os.path.exists(user_index))
+        self.assertTrue(os.path.exists(os.path.join(user_index, "params.index.json")))
+        
+        # Check that list_user_indices returns it
+        indices = list_user_indices()
+        self.assertIn("my_test_index", indices)
+
+    def test_search_with_user_flag_and_index_name(self):
+        """Test searching with -u and -i flags."""
+        # First index
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", self.corpus_file, "-u", "-o", "search_test_index"])
+        finally:
+            sys.stdout = old_stdout
+        
+        # Now search using -u and -i
+        sys.stdout = StringIO()
+        
+        try:
+            main(["search", "-u", "-i", "search_test_index", "hello"])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        self.assertIn("Search results for:", output)
+        self.assertIn("hello world", output)
+
+    def test_parser_shorthand_flags(self):
+        """Test that shorthand flags work correctly."""
+        parser = create_parser()
+        
+        # Test -i shorthand for --index
+        args = parser.parse_args(["search", "-i", "myindex", "query"])
+        self.assertEqual(args.index, "myindex")
+        
+        # Test -u shorthand for --user in search
+        args = parser.parse_args(["search", "-u", "-i", "myindex", "query"])
+        self.assertTrue(args.user)
+        
+        # Test -u shorthand for --user in index
+        args = parser.parse_args(["index", "file.txt", "-u"])
+        self.assertTrue(args.user)
+        
+        # Test combined flags
+        args = parser.parse_args(["search", "-u", "-i", "idx", "-k", "5", "query"])
+        self.assertTrue(args.user)
+        self.assertEqual(args.index, "idx")
+        self.assertEqual(args.top_k, 5)
+
+    def test_index_user_default_name(self):
+        """Test that -u without -o uses default name."""
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        
+        try:
+            main(["index", self.corpus_file, "-u"])
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+        
+        # Default name should be corpus_index
+        user_index = os.path.join(self.tmpdirname, ".bm25s", "indices", "corpus_index")
+        self.assertTrue(os.path.exists(user_index))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
