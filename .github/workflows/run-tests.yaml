@@ -72,6 +72,10 @@ jobs:
 
   test-high-level:
     runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
     steps:
     - name: Check out repository
       uses: actions/checkout@v2
@@ -81,8 +85,9 @@ jobs:
         python-version: '3.10'
     - name: Install high-level dependencies
       run: |
+        pip install "numba>=0.62.0"
         pip install -r tests/requirements-core.txt
-        pip install numba
+        pip install --upgrade numpy
     - name: Run high-level tests
       run: |
         python -X faulthandler -m unittest discover tests/high_level
