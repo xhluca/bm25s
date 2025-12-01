@@ -73,8 +73,8 @@ class BM25Search:
             return_as="tuple",
         )
 
-        # compile and index
-        self.retriever.compile(activate_numba=True, warmup=True)
+        # compile and index (warmup=False to avoid segfaults in some CI environments)
+        self.retriever.compile(activate_numba=True, warmup=False)
         
         create_empty_token = True
         # If the corpus is empty or has no tokens, we can't create an empty token
