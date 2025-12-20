@@ -169,10 +169,13 @@ class BM25:
         int_dtype : str
             The data type of the indices in the BM25 scores.
 
-        corpus : Iterable[Dict]
+        corpus : Iterable[str] or Iterable[Dict] or Iterable[List] or Iterable[Tuple]
             The corpus of documents. This is optional and is used for saving the corpus
-            to the snapshot. We expect the corpus to be a list of dictionaries, where each
-            dictionary represents a document.
+            to the snapshot. The corpus can be:
+            - A list of strings (e.g., ["text1", "text2"])
+            - A list of dictionaries (e.g., [{"text": "...", "metadata": {...}}, ...])
+            - A list of lists or tuples (any JSON-serializable structure)
+            When saved, strings are automatically converted to {"id": <index>, "text": <string>} format.
 
         backend : str
             The backend used during retrieval. By default, it uses the numpy backend, which
@@ -633,11 +636,16 @@ class BM25:
             List of list of tokens for each query. If a Tokenized object is provided,
             it will be converted to a list of list of tokens.
 
-        corpus : List[str] or np.ndarray
+        corpus : List[str] or List[Dict] or List[Any] or np.ndarray
             List of "documents" or a numpy array of documents. If provided, the function
-            will return the documents instead of the indices. You do not have to provide
-            the original documents (for example, you can provide the unique IDs of the
-            documents here and then retrieve the actual documents from another source).
+            will return the documents instead of the indices. The corpus can be:
+            - A list of strings (the original documents)
+            - A list of dictionaries (documents with metadata)
+            - A list of any other type (e.g., document IDs)
+            - A numpy array
+            You do not have to provide the original documents (for example, you can provide 
+            the unique IDs of the documents here and then retrieve the actual documents from 
+            another source).
 
         k : int
             Number of documents to retrieve for each query.
@@ -895,8 +903,13 @@ class BM25:
         save_dir : str
             The directory where the BM25S index will be saved.
 
-        corpus : List[Dict]
-            The corpus of documents. If provided, it will be saved to the `corpus` file.
+        corpus : Iterable[str] or Iterable[Dict] or Iterable[List] or Iterable[Tuple]
+            The corpus of documents. If provided, it will be saved to the `corpus_name` file.
+            The corpus can be:
+            - A list of strings (e.g., ["text1", "text2"])
+            - A list of dictionaries (e.g., [{"text": "...", "metadata": {...}}, ...])
+            - A list of lists or tuples (any JSON-serializable structure)
+            When saved, strings are automatically converted to {"id": <index>, "text": <string>} format.
 
         corpus_name : str
             The name of the file that will contain the corpus.
