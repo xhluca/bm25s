@@ -193,7 +193,7 @@ retriever.save("index_dir", corpus=corpus)
 ```
 Dictionaries can have any keys you want - they are saved as-is in JSON format.
 
-**3. List of any JSON-serializable objects** (lists, tuples, etc.):
+**3. List of any JSON-serializable objects** (e.g., lists):
 ```python
 corpus = [
     ["doc1", "category_A", "2024"],

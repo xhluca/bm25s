@@ -169,12 +169,12 @@ class BM25:
         int_dtype : str
             The data type of the indices in the BM25 scores.
 
-        corpus : Iterable[str] or Iterable[Dict] or Iterable[List] or Iterable[Tuple]
+        corpus : Iterable[str] or Iterable[Dict] or Iterable[List]
             The corpus of documents. This is optional and is used for saving the corpus
             to the snapshot. The corpus can be:
             - A list of strings (e.g., ["text1", "text2"])
             - A list of dictionaries (e.g., [{"text": "...", "metadata": {...}}, ...])
-            - A list of lists or tuples (any JSON-serializable structure)
+            - A list of lists (any JSON-serializable structure)
             When saved, strings are automatically converted to {"id": <index>, "text": <string>} format.
 
         backend : str
@@ -903,13 +903,13 @@ class BM25:
         save_dir : str
             The directory where the BM25S index will be saved.
 
-        corpus : Iterable[str] or Iterable[Dict] or Iterable[List] or Iterable[Tuple]
+        corpus : Iterable[str] or Iterable[Dict] or Iterable[List]
             The corpus of documents. If provided, it will be saved to the file specified by 
             the `corpus_name` parameter (default: "corpus.jsonl").
             The corpus can be:
             - A list of strings (e.g., ["text1", "text2"])
             - A list of dictionaries (e.g., [{"text": "...", "metadata": {...}}, ...])
-            - A list of lists or tuples (any JSON-serializable structure)
+            - A list of lists (any JSON-serializable structure)
             When saved, strings are automatically converted to {"id": <index>, "text": <string>} format.
 
         corpus_name : str
