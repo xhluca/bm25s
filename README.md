@@ -169,6 +169,45 @@ for i in range(results.shape[1]):
     print(f"Rank {i+1}: {results[0, i]}")
 ```
 
+### Corpus Formats
+
+The `corpus` parameter in `bm25s` is flexible and supports multiple formats:
+
+**1. List of strings** (simplest format, shown in quickstart):
+```python
+corpus = [
+    "a cat is a feline and likes to purr",
+    "a dog is the human's best friend and loves to play",
+]
+retriever.save("index_dir", corpus=corpus)
+```
+When saved, strings are automatically converted to `{"id": <index>, "text": <string>}` format.
+
+**2. List of dictionaries** (for documents with metadata):
+```python
+corpus = [
+    {"text": "a cat is a feline", "title": "About Cats", "author": "John"},
+    {"text": "a dog is a friend", "title": "About Dogs", "author": "Jane"},
+]
+retriever.save("index_dir", corpus=corpus)
+```
+Dictionaries can have any keys you want - they are saved as-is in JSON format.
+
+**3. List of any JSON-serializable objects** (lists, tuples, etc.):
+```python
+corpus = [
+    ["doc1", "category_A", "2024"],
+    ["doc2", "category_B", "2024"],
+]
+retriever.save("index_dir", corpus=corpus)
+```
+
+**Important notes:**
+- The corpus you pass to `save()` or `BM25(corpus=...)` is for **saving/loading purposes only**
+- For **indexing**, you must tokenize your text first using `bm25s.tokenize()`
+- The corpus items can be retrieved later using `retrieve(..., corpus=corpus)` to return documents instead of indices
+- For more details, see [`examples/index_with_metadata.py`](examples/index_with_metadata.py)
+
 ### Memory Efficient Retrieval
 
 `bm25s` is designed to be memory efficient. You can use the `mmap` option to load the BM25 index as a memory-mapped file, which allows you to load the index without loading the full index into memory. This is useful when you have a large index and want to save memory:
@@ -440,6 +479,51 @@ Similarly, for MSMARCO (8M+ documents, 300M+ tokens), we show the following resu
 | In-memory     | 25.71          | 93.66         | 10.21               | 10.34                  |
 | Memory-mapped | 1.24           | 90.41         | 1.14                | 4.88                   |
 | Mmap+Reload   | 1.17           | 97.89         | 1.14                | 1.38                   |
+
+## API Reference and Documentation
+
+### Where is the API documentation?
+
+The primary API documentation is available through:
+1. **Source code docstrings**: The main API is documented in [`bm25s/__init__.py`](https://github.com/xhluca/bm25s/blob/main/bm25s/__init__.py) with detailed docstrings for all methods
+2. **Examples directory**: See [`examples/`](examples/) for practical usage examples
+3. **Homepage**: Visit [bm25s.github.io](https://bm25s.github.io) for additional resources
+
+### Quick API Overview
+
+The main methods you'll use are:
+
+- **`bm25s.tokenize(texts, ...)`**: Tokenize corpus or queries
+  ```python
+  tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=stemmer)
+  ```
+
+- **`BM25()`**: Initialize a BM25 model
+  ```python
+  retriever = bm25s.BM25(k1=1.5, b=0.75, method="lucene")
+  ```
+
+- **`retriever.index(tokens)`**: Index your tokenized corpus
+  ```python
+  retriever.index(corpus_tokens)
+  ```
+
+- **`retriever.retrieve(query_tokens, k=10, corpus=None)`**: Search and retrieve top-k results
+  ```python
+  results, scores = retriever.retrieve(query_tokens, k=10)
+  # Or return actual documents:
+  results, scores = retriever.retrieve(query_tokens, k=10, corpus=corpus)
+  ```
+
+- **`retriever.save(dir, corpus=None)`**: Save index and optionally corpus
+  ```python
+  retriever.save("my_index", corpus=corpus)
+  ```
+
+- **`BM25.load(dir, load_corpus=False)`**: Load saved index
+  ```python
+  retriever = bm25s.BM25.load("my_index", load_corpus=True)
+  ```
 
 ## Acknowledgement
 
