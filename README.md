@@ -485,7 +485,7 @@ Similarly, for MSMARCO (8M+ documents, 300M+ tokens), we show the following resu
 ### Where is the API documentation?
 
 The primary API documentation is available through:
-1. **Source code docstrings**: The main API is documented in [`bm25s/__init__.py`](https://github.com/xhluca/bm25s/blob/main/bm25s/__init__.py) with detailed docstrings for all methods
+1. **Source code docstrings**: The main API is documented in `bm25s/__init__.py` with detailed docstrings for all methods
 2. **Examples directory**: See [`examples/`](examples/) for practical usage examples
 3. **Homepage**: Visit [bm25s.github.io](https://bm25s.github.io) for additional resources
 

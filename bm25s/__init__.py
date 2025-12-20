@@ -904,7 +904,8 @@ class BM25:
             The directory where the BM25S index will be saved.
 
         corpus : Iterable[str] or Iterable[Dict] or Iterable[List] or Iterable[Tuple]
-            The corpus of documents. If provided, it will be saved to the `corpus_name` file.
+            The corpus of documents. If provided, it will be saved to the file specified by 
+            the `corpus_name` parameter (default: "corpus.jsonl").
             The corpus can be:
             - A list of strings (e.g., ["text1", "text2"])
             - A list of dictionaries (e.g., [{"text": "...", "metadata": {...}}, ...])
