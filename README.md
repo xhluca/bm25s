@@ -193,15 +193,6 @@ retriever.save("index_dir", corpus=corpus)
 ```
 Dictionaries can have any keys you want - they are saved as-is in JSON format.
 
-**3. List of any JSON-serializable objects** (e.g., lists):
-```python
-corpus = [
-    ["doc1", "category_A", "2024"],
-    ["doc2", "category_B", "2024"],
-]
-retriever.save("index_dir", corpus=corpus)
-```
-
 **Important notes:**
 - The corpus you pass to `save()` or `BM25(corpus=...)` is for **saving/loading purposes only**
 - For **indexing**, you must tokenize your text first using `bm25s.tokenize()`
