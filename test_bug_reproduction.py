@@ -56,7 +56,8 @@ def test_token_ids_bug_with_non_sequential_ids():
 def test_token_ids_with_sequential_ids():
     """
     Test that works with sequential IDs starting from 0.
-    This currently works but may produce incorrect results.
+    This works because sequential IDs coincidentally map to themselves,
+    but still exercises the remapping logic correctly.
     """
     print("\nTesting token_ids indexing with sequential IDs (0, 1, 2...)...")
     

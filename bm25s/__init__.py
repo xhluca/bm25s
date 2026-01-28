@@ -742,13 +742,15 @@ class BM25:
                     if token_id in self.unique_token_ids_set
                 ]
                 if len(query_filtered) == 0:
-                    if "" not in self.vocab_dict:
+                    # For token_ids path, vocab_dict uses integer keys, not ""
+                    # For other paths, vocab_dict uses string keys including ""
+                    has_empty_token = ("" in self.vocab_dict) if not (hasattr(self, '_indexed_with_token_ids') and self._indexed_with_token_ids) else False
+                    
+                    if not has_empty_token:
                         raise ValueError(
                             "The query does not contain any tokens that are in the vocabulary. "
                             "Please provide a query that contains at least one token that is in the vocabulary. "
-                            "Alternatively, you can set `create_empty_token=True` when calling `index` to add an empty token to the vocabulary. "
-                            "You can also manually add an empty token to the vocabulary by setting `retriever.vocab_dict[''] = max(retriever.vocab_dict.values()) + 1`. "
-                            "Then, run `retriever.unique_token_ids_set = set(retriever.vocab_dict.values())` to update the unique token IDs."
+                            "Alternatively, you can set `create_empty_token=True` when calling `index` to add an empty token to the vocabulary."
                         )
                     query_filtered = [self.vocab_dict[""]]
                 
@@ -983,6 +985,7 @@ class BM25:
             num_docs=self.scores["num_docs"],
             version=__version__,
             backend=self.backend,
+            indexed_with_token_ids=getattr(self, '_indexed_with_token_ids', False),
         )
         with open(params_path, "w") as f:
             json.dump(params, f, indent=4)
@@ -1158,11 +1161,23 @@ class BM25:
 
         original_version = params.pop("version", None)
         num_docs = params.pop("num_docs", None)
+        indexed_with_token_ids = params.pop("indexed_with_token_ids", False)
+
+        # If indexed with token_ids, convert string keys back to integers
+        # (JSON serialization converts integer keys to strings)
+        if indexed_with_token_ids and vocab_dict:
+            vocab_dict = {int(k): v for k, v in vocab_dict.items()}
 
         bm25_obj = cls(**params)
         bm25_obj.vocab_dict = vocab_dict
         bm25_obj._original_version = original_version
-        bm25_obj.unique_token_ids_set = set(bm25_obj.vocab_dict.values())
+        bm25_obj._indexed_with_token_ids = indexed_with_token_ids
+        
+        # Set unique_token_ids_set based on whether it was indexed with token_ids path
+        if indexed_with_token_ids:
+            bm25_obj.unique_token_ids_set = set(bm25_obj.vocab_dict.keys())
+        else:
+            bm25_obj.unique_token_ids_set = set(bm25_obj.vocab_dict.values())
 
         bm25_obj.load_scores(
             save_dir=save_dir,
