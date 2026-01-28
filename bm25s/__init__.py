@@ -482,7 +482,8 @@ class BM25:
                 
                 # create the vocab_dict from the unique token IDs
                 # vocab_dict maps original token ID -> sequential index for remapping
-                vocab_dict = {token_id: i for i, token_id in enumerate(unique_ids)}
+                # Sort unique_ids for deterministic ordering
+                vocab_dict = {token_id: i for i, token_id in enumerate(sorted(unique_ids))}
                 
                 # Remap corpus_token_ids to sequential indices
                 corpus_token_ids = [
@@ -519,8 +520,10 @@ class BM25:
         # For token_ids path, use keys (original IDs); for other paths, use values (sequential IDs)
         if inferred_corpus_obj == "token_ids":
             self.unique_token_ids_set = set(self.vocab_dict.keys())
+            self._indexed_with_token_ids = True  # Flag to indicate token_ids path was used
         else:
             self.unique_token_ids_set = set(self.vocab_dict.values())
+            self._indexed_with_token_ids = False
 
     def get_tokens_ids(self, query_tokens: List[str]) -> List[int]:
         """
@@ -749,8 +752,8 @@ class BM25:
                         )
                     query_filtered = [self.vocab_dict[""]]
                 
-                # If vocab_dict has integer keys (token_ids path), remap to sequential indices
-                if len(query_filtered) > 0 and isinstance(list(self.vocab_dict.keys())[0], int):
+                # If indexed with token_ids path, remap to sequential indices
+                if hasattr(self, '_indexed_with_token_ids') and self._indexed_with_token_ids:
                     query_filtered = [self.vocab_dict[token_id] for token_id in query_filtered]
 
                 query_tokens_filtered.append(query_filtered)
