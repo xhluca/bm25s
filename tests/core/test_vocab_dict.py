@@ -72,6 +72,6 @@ class TestVocabDict(unittest.TestCase):
         # create_empty_token=False
         retriever = bm25s.BM25(method='bm25+')
         # assert that this will throw an error
-        with self.assertRaises(IndexError):
+        with self.assertRaises(ValueError):
             retriever.index(corpus_tokens, create_empty_token=False)
             retriever.retrieve(new_docs_tokens, k=1)

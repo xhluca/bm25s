@@ -469,9 +469,9 @@ class BM25:
             elif inferred_corpus_obj == "token_ids":
                 # we need to create a vocab_dict from the unique token IDs
                 logger.debug(msg="Building index from token IDs")
-                corpus_token_ids = corpus
+                corpus_token_ids_original = corpus
                 unique_ids = set()
-                for doc_ids in corpus_token_ids:
+                for doc_ids in corpus_token_ids_original:
                     unique_ids.update(doc_ids)
                 # if there's allowed empty token, we need to add it to the vocab_dict to either 0 or max+1
                 if create_empty_token:
@@ -481,7 +481,19 @@ class BM25:
                         unique_ids.add(max(unique_ids) + 1)
                 
                 # create the vocab_dict from the unique token IDs
+                # vocab_dict maps original token ID -> sequential index for remapping
                 vocab_dict = {token_id: i for i, token_id in enumerate(unique_ids)}
+                
+                # Remap corpus_token_ids to sequential indices
+                corpus_token_ids = [
+                    [vocab_dict[token_id] for token_id in doc_ids]
+                    for doc_ids in tqdm(
+                        corpus_token_ids_original,
+                        desc="BM25S Remap token IDs to indices",
+                        leave=leave_progress,
+                        disable=not show_progress,
+                    )
+                ]
                 
             else:
                 raise ValueError(
@@ -504,7 +516,11 @@ class BM25:
         self.vocab_dict = vocab_dict
 
         # we create unique token IDs from the vocab_dict for faster lookup
-        self.unique_token_ids_set = set(self.vocab_dict.values())
+        # For token_ids path, use keys (original IDs); for other paths, use values (sequential IDs)
+        if inferred_corpus_obj == "token_ids":
+            self.unique_token_ids_set = set(self.vocab_dict.keys())
+        else:
+            self.unique_token_ids_set = set(self.vocab_dict.values())
 
     def get_tokens_ids(self, query_tokens: List[str]) -> List[int]:
         """
@@ -732,6 +748,10 @@ class BM25:
                             "Then, run `retriever.unique_token_ids_set = set(retriever.vocab_dict.values())` to update the unique token IDs."
                         )
                     query_filtered = [self.vocab_dict[""]]
+                
+                # If vocab_dict has integer keys (token_ids path), remap to sequential indices
+                if len(query_filtered) > 0 and isinstance(list(self.vocab_dict.keys())[0], int):
+                    query_filtered = [self.vocab_dict[token_id] for token_id in query_filtered]
 
                 query_tokens_filtered.append(query_filtered)
 
