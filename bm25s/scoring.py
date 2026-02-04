@@ -237,8 +237,10 @@ def _select_idf_scorer(method) -> callable:
 
 def _get_counts_from_token_ids(token_ids, dtype, int_dtype):
     token_counter = Counter(token_ids)
-    voc_ind = np.array(list(token_counter.keys()), dtype=int_dtype)
-    tf_array = np.array(list(token_counter.values()), dtype=dtype)
+    n = len(token_counter)
+    # Use fromiter which is faster than array(list(...))
+    voc_ind = np.fromiter(token_counter.keys(), dtype=int_dtype, count=n)
+    tf_array = np.fromiter(token_counter.values(), dtype=dtype, count=n)
 
     return voc_ind, tf_array
 

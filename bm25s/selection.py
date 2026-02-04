@@ -12,29 +12,20 @@ else:
 
 
 def _topk_numpy(query_scores, k, sorted):
-    # https://stackoverflow.com/questions/65038206/how-to-get-indices-of-top-k-values-from-a-numpy-array
-    # np.argpartition is faster than np.argsort, but do not return the values in order
-    partitioned_ind = np.argpartition(query_scores, -k)
-    # Since lit's a single query, we can take the last k elements
-    partitioned_ind = partitioned_ind.take(indices=range(-k, 0))
-    # We use the newly selected indices to find the score of the top-k values
-    partitioned_scores = np.take(query_scores, partitioned_ind)
+    # np.argpartition is faster than np.argsort, but does not return values in order
+    # Use slicing [-k:] instead of .take(range(-k, 0)) for better performance
+    partitioned_ind = np.argpartition(query_scores, -k)[-k:]
 
     if sorted:
-        # Since our top-k indices are not correctly ordered, we can sort them with argsort
-        # only if sorted=True (otherwise we keep it in an arbitrary order)
-        sorted_trunc_ind = np.flip(np.argsort(partitioned_scores))
-
-        # We again use np.take_along_axis as we have an array of indices that we use to
-        # decide which values to select
-        ind = partitioned_ind[sorted_trunc_ind]
-        query_scores = partitioned_scores[sorted_trunc_ind]
-
+        # Sort by scores at the partitioned indices (descending)
+        order = np.argsort(query_scores[partitioned_ind])[::-1]
+        ind = partitioned_ind[order]
+        scores = query_scores[ind]
     else:
         ind = partitioned_ind
-        query_scores = partitioned_scores
+        scores = query_scores[partitioned_ind]
 
-    return query_scores, ind
+    return scores, ind
 
 
 def _topk_jax(query_scores, k):

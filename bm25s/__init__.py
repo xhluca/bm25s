@@ -309,14 +309,22 @@ class BM25:
         indptr_starts = indptr[query_tokens_ids]
         indptr_ends = indptr[query_tokens_ids + 1]
 
-        scores = np.zeros(num_docs, dtype=dtype)
-        for i in range(len(query_tokens_ids)):
-            start, end = indptr_starts[i], indptr_ends[i]
-            np.add.at(scores, indices[start:end], data[start:end])
+        # Collect all slices first, then concatenate and do a single add.at
+        # This is faster than multiple add.at calls in a loop
+        indices_lists = []
+        data_lists = []
 
-            # # The following code is slower with numpy, but faster after JIT compilation
-            # for j in range(start, end):
-            #     scores[indices[j]] += data[j]
+        for start, end in zip(indptr_starts, indptr_ends):
+            indices_lists.append(indices[start:end])
+            data_lists.append(data[start:end])
+
+        scores = np.zeros(num_docs, dtype=dtype)
+        if len(indices_lists) == 0:
+            return scores
+
+        all_indices = np.concatenate(indices_lists)
+        all_data = np.concatenate(data_lists)
+        np.add.at(scores, all_indices, all_data)
 
         return scores
 
