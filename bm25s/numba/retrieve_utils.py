@@ -9,6 +9,15 @@ from ..scoring import _compute_relevance_from_scores_jit_ready
 from .selection import _numba_sorted_top_k
 
 _compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
+# _numba_sorted_top_k is already jitted in selection.py, so we can use it directly
+_numba_sorted_top_k_jit = _numba_sorted_top_k
+
+# Threshold for estimated matching documents to switch algorithms.
+# Two-step iterates O(num_docs) for top-k but has lower constant overhead.
+# Fused iterates O(matching_docs) for top-k but has tracking overhead.
+# When matching_docs approaches num_docs, two-step wins due to simpler code.
+# When matching_docs << num_docs, fused wins by skipping non-matching docs.
+_MATCHING_DOCS_THRESHOLD = 50000  # Use two-step when estimated matches > this
 
 
 @njit
@@ -137,6 +146,79 @@ def _fused_score_and_topk(
 
     return result_scores, result_indices
 
+
+@njit
+def _two_step_score_and_topk(
+    query_tokens,
+    data,
+    indptr,
+    indices,
+    num_docs,
+    k,
+    dtype,
+    nonoccurrence_array=None,
+    weight_mask=None,
+    sorted_results=True,
+):
+    """
+    Two-step scoring and top-k selection: compute all scores, then find top-k.
+    More efficient for dense queries where most documents match.
+
+    Step 1: O(num_docs) - compute scores for all documents
+    Step 2: O(num_docs) - heap-based top-k selection
+
+    This approach has lower constant overhead than the fused algorithm,
+    making it faster when most documents have non-zero scores.
+    """
+    # Step 1: Compute relevance scores for all documents
+    scores = _compute_relevance_from_scores_jit_ready(
+        data=data,
+        indptr=indptr,
+        indices=indices,
+        num_docs=num_docs,
+        query_tokens_ids=query_tokens,
+        dtype=dtype,
+    )
+
+    # Handle nonoccurrence array (for bm25l, bm25+ variants)
+    if nonoccurrence_array is not None:
+        nonoccurrence_sum = dtype.type(0.0)
+        for token_id in query_tokens:
+            nonoccurrence_sum += nonoccurrence_array[token_id]
+        # Add to all documents with non-zero scores
+        for i in range(num_docs):
+            if scores[i] > 0:
+                scores[i] += nonoccurrence_sum
+
+    # Handle weight mask
+    if weight_mask is not None:
+        for i in range(num_docs):
+            scores[i] *= weight_mask[i]
+
+    # Step 2: Find top-k using heap-based selection
+    result_scores, result_indices = _numba_sorted_top_k_jit(scores, k, sorted_results)
+
+    return result_scores, result_indices
+
+
+@njit
+def _estimate_query_density(query_tokens, indptr, num_docs):
+    """
+    Estimate the density of a query (fraction of documents that match).
+
+    Uses the sum of posting list sizes as an upper bound on matching documents.
+    The actual number of unique matching docs could be lower due to overlap,
+    but this estimate is fast and works well in practice.
+
+    Returns a value between 0 and 1+ (can exceed 1 due to overlap).
+    """
+    total_postings = 0
+    for token_id in query_tokens:
+        total_postings += indptr[token_id + 1] - indptr[token_id]
+
+    return total_postings / num_docs
+
+
 @njit(parallel=True)
 def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
@@ -151,7 +233,20 @@ def _retrieve_internal_jitted_parallel(
     num_docs: int,
     nonoccurrence_array: np.ndarray = None,
     weight_mask: np.ndarray = None,
+    matching_docs_threshold: float = _MATCHING_DOCS_THRESHOLD,
 ):
+    """
+    Parallel retrieval with adaptive algorithm selection.
+
+    For each query, estimates the number of matching documents and selects
+    the optimal algorithm:
+    - Few matches (< threshold): use fused algorithm (skips non-matching docs)
+    - Many matches (>= threshold): use two-step algorithm (lower overhead)
+
+    The fused algorithm avoids iterating over all documents in top-k but has
+    overhead from tracking matching documents. The two-step algorithm iterates
+    over all documents but has lower constant overhead per document.
+    """
     N = len(query_pointers) - 1
 
     topk_scores = np.zeros((N, k), dtype=dtype)
@@ -160,19 +255,45 @@ def _retrieve_internal_jitted_parallel(
     for i in prange(N):
         query_tokens_single = query_tokens_ids_flat[query_pointers[i] : query_pointers[i + 1]]
 
-        # Use fused scoring + top-k for better performance
-        topk_scores_sing, topk_indices_sing = _fused_score_and_topk(
-            query_tokens=query_tokens_single,
-            data=data,
-            indptr=indptr,
-            indices=indices,
-            num_docs=num_docs,
-            k=k,
-            dtype=dtype,
-            nonoccurrence_array=nonoccurrence_array,
-            weight_mask=weight_mask,
-            sorted_results=sorted,
-        )
+        # Estimate matching docs to choose optimal algorithm
+        # Two-step: O(num_docs) for top-k but simpler per-doc
+        # Fused: O(matching_docs) for top-k but has tracking overhead
+        # Use two-step only when BOTH:
+        # 1. Many absolute matches (so fused tracking overhead matters)
+        # 2. High density (so iterating all docs isn't much worse)
+        density = _estimate_query_density(query_tokens_single, indptr, num_docs)
+        estimated_matches = density * num_docs
+        use_twostep = estimated_matches >= _MATCHING_DOCS_THRESHOLD and density >= 0.3
+
+        if not use_twostep:
+            # Use fused algorithm (avoids iterating all docs in top-k)
+            topk_scores_sing, topk_indices_sing = _fused_score_and_topk(
+                query_tokens=query_tokens_single,
+                data=data,
+                indptr=indptr,
+                indices=indices,
+                num_docs=num_docs,
+                k=k,
+                dtype=dtype,
+                nonoccurrence_array=nonoccurrence_array,
+                weight_mask=weight_mask,
+                sorted_results=sorted,
+            )
+        else:
+            # Dense query: use two-step algorithm (lower overhead)
+            topk_scores_sing, topk_indices_sing = _two_step_score_and_topk(
+                query_tokens=query_tokens_single,
+                data=data,
+                indptr=indptr,
+                indices=indices,
+                num_docs=num_docs,
+                k=k,
+                dtype=dtype,
+                nonoccurrence_array=nonoccurrence_array,
+                weight_mask=weight_mask,
+                sorted_results=sorted,
+            )
+
         topk_scores[i] = topk_scores_sing
         topk_indices[i] = topk_indices_sing
 
