@@ -2,7 +2,7 @@
 
 <h1>BM25S⚡</h1>
 
-<i>BM25S (or BM25-Sparse) is an ultrafast implementation of BM25 in pure Python, powered by Scipy sparse matrices</i>
+<i>BM25S (or BM25-Sparse) is an ultrafast implementation of BM25 in pure Python, powered by Numpy</i>
 
 <table>
       <tr>
@@ -36,8 +36,8 @@
 Welcome to `bm25s`, a library that implements BM25 in Python, allowing you to rank documents based on a query. BM25 is a widely used ranking function used for text retrieval tasks, and is a core component of search services like Elasticsearch.
 
 It is designed to be:
-* **Fast**: `bm25s` is implemented in pure Python and leverage Scipy sparse matrices to store eagerly computed scores for all document tokens. This allows extremely fast scoring at query time, improving performance over popular libraries by orders of magnitude (see benchmarks below).
-* **Simple**: `bm25s` is designed to be easy to use and understand. You can install it with pip and start using it in minutes. There is no dependencies on Java or Pytorch - all you need is Scipy and Numpy, and optional lightweight dependencies for stemming.
+* **Fast**: `bm25s` is implemented in pure Python and leverage sparse matrices to store eagerly computed scores for all document tokens. This allows extremely fast scoring at query time, improving performance over popular libraries by orders of magnitude (see benchmarks below).
+* **Simple**: `bm25s` is designed to be easy to use and understand. You can install it with pip and start using it in minutes. There is no dependencies on Java or Pytorch - all you need is Numpy, and optional lightweight dependencies for stemming and speedup via `numba` compilation.
 
 Below, we compare `bm25s` with Elasticsearch in terms of speedup over `rank-bm25`, the most popular Python implementation of BM25. We measure the throughput in queries per second (QPS) on a few popular datasets from [BEIR](https://github.com/beir-cellar/beir) in a single-threaded setting.
 
@@ -136,6 +136,133 @@ reloaded_retriever = bm25s.BM25.load("animal_index_bm25", load_corpus=True)
 ```
 
 For an example that shows how to quickly index a 2M-documents corpus (Natural Questions), check out [`examples/index_nq.py`](examples/index_nq.py).
+
+## High Level API
+
+If you want to quickly search on a local file, you can use the `bm25s.high_level` module:
+
+```python
+import bm25s.high_level as bm25
+
+# Load a file (csv, json, jsonl, txt)
+# For csv/jsonl, you can specify the column/key to use as document text
+corpus = bm25.load("tests/data/dummy.csv", document_column="text")
+# Index the corpus
+retriever = bm25.index(corpus)
+
+# Search
+results = retriever.search(["your query here"], k=5)
+for result in results[0]:
+    print(result)
+```
+
+The `load` function handles file reading, while `index` handles tokenization, indexing, and provides a simple search interface.
+
+## Command-Line Interface
+
+`bm25s` provides a terminal-based CLI for quick indexing and searching without writing Python code.
+
+### Indexing Documents
+
+Create an index from a CSV, TXT, JSON, or JSONL file:
+
+```bash
+# Index a CSV file (uses first column by default)
+bm25 index documents.csv -o my_index
+
+# Index with a specific column
+bm25 index documents.csv -o my_index -c text
+
+# Index a text file (one document per line)
+bm25 index documents.txt -o my_index
+
+# Index a JSONL file
+bm25 index documents.jsonl -o my_index -c content
+```
+
+If you don't specify an output directory with `-o`, the index will be saved to `<filename>_index`.
+
+### User Directory
+
+You can save indices to a central user directory (`~/.bm25s/indices/`) using the `-u` flag:
+
+```bash
+# Save index to ~/.bm25s/indices/my_docs
+bm25 index documents.csv -u -o my_docs
+
+# Search using the user directory
+bm25 search -u -i my_docs "your query"
+```
+
+### Searching
+
+Search an existing index with a query using `-i` (or `--index`):
+
+```bash
+# Basic search (returns top 10 results)
+bm25 search -i my_index "what is machine learning?"
+
+# Search with full path
+bm25 search -i ./path/to/my_index "your query here"
+
+# Return more results
+bm25 search -i my_index "your query here" -k 20
+
+# Save results to a JSON file
+bm25 search -i my_index "your query here" -s results.json
+```
+
+### Interactive Index Picker
+
+When using `-u` without specifying an index name, an interactive picker is displayed (requires `bm25s[cli]`):
+
+```bash
+# Install CLI extras for colored interactive picker
+pip install "bm25s[cli]"
+
+# Interactive picker will show available indices
+bm25 search -u "your query"
+```
+
+### Example Workflow
+
+**Basic usage** (index saved to current directory):
+
+```bash
+# 1. Create a simple text file with documents
+echo -e "Machine learning is a subset of AI\nDeep learning uses neural networks\nNatural language processing handles text" > docs.txt
+
+# 2. Index the documents
+bm25 index docs.txt -o my_index
+
+# 3. Search the index
+bm25 search -i my_index "what is AI?"
+```
+
+**With user directory** (indices saved to `~/.bm25s/indices/`):
+
+```bash
+# Index to user directory
+bm25 index docs.txt -u -o ml_docs
+
+# Search from user directory
+bm25 search -u -i ml_docs "what is AI?"
+
+# Or use the interactive picker
+bm25 search -u "what is AI?"
+```
+
+### CLI Reference
+
+| Command | Flag | Description |
+|---------|------|-------------|
+| `index` | `-o, --output` | Output directory for the index |
+| `index` | `-c, --column` | Column name for document text |
+| `index` | `-u, --user` | Save to user directory (`~/.bm25s/indices/`) |
+| `search` | `-i, --index` | Path to index (or name if using `-u`) |
+| `search` | `-k, --top-k` | Number of results (default: 10) |
+| `search` | `-s, --save` | Save results to JSON file |
+| `search` | `-u, --user` | Use user directory; shows picker if `-i` omitted |
 
 ## Flexibility
 
@@ -349,11 +476,93 @@ results, scores = retriever.retrieve(query_tokens, k=2)
 For a complete example, check out:
 * [`examples/index_to_hf.py`](examples/index_to_hf.py) for indexing a corpus and upload to Huggingface Hub
 * [`examples/retrieve_from_hf.py`](examples/retrieve_from_hf.py) for loading an index alongside corpus from Huggingface Hub and querying it.
+* [`examples/mcp/create_index.py`](examples/mcp/create_index.py) for creating a test index for the MCP server.
+* [`examples/mcp/verify_server.py`](examples/mcp/verify_server.py) for programmatically verifying the MCP server.
+
+## MCP Server
+
+`bm25s` comes with a built-in Model Context Protocol (MCP) server, allowing you to expose your BM25 index as a tool for LLMs and other agents.
+
+### Installation
+
+To use the MCP server, you need to install `bm25s` with the `mcp` extra. We recommend using `uv` for managing your environment:
+
+```bash
+# Create a virtual environment
+uv venv
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Install bm25s with the mcp extra
+uv pip install "bm25s[mcp]"
+
+# or locally:
+uv pip install -e ".[mcp]"
+```
+
+### Launching the Server
+
+You can launch the MCP server using the `bm25` CLI:
+
+```bash
+source .venv/bin/activate
+bm25 mcp launch --port 8000 --index-dir /path/to/your/index
+```
+
+### Example
+
+For example, you can create a test index and launch the server with:
+
+```bash
+source .venv/bin/activate
+python examples/index_nq.py # creates bm25s_indices/nq
+bm25 mcp launch --port 8000 --index-dir ./bm25s_indices/nq
+```
+
+Then, you can verify the server with:
+
+```bash
+python examples/mcp/verify_server.py
+```
+
+### Tools
+
+The server exposes the following tools:
+
+*   `retrieve(query: str, k: int = 10)`: Retrieves the top-k documents for a given query.
+*   `get_info()`: Returns information about the loaded index (vocabulary size, number of documents, backend).
+
+### Example Usage with Claude Desktop
+
+To use `bm25s` with Claude Desktop, add the following to your `claude_desktop_config.json` (located at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "bm25s": {
+      "command": "/absolute/path/to/uv",
+      "args": [
+        "--directory",
+        "/ABSOLUTE/PATH/TO/PARENT/FOLDER/bm25s",
+        "run",
+        "bm25",
+        "mcp",
+        "launch",
+        "--index-dir",
+        "/absolute/path/to/your/index"
+      ]
+    }
+  }
+}
+```
+
+To find the absolute path to `uv`, you can run `which uv` in the terminal.
 
 ## Comparison
 
 Here are some benchmarks comparing `bm25s` to other popular BM25 implementations. We compare the following implementations:
-* `bm25s`: Our implementation of BM25 in pure Python, powered by Scipy sparse matrices.
+* `bm25s`: Our implementation of BM25 in pure Python, powered by Numpy and sparse matrices.
 * `rank-bm25` (`Rank`): A popular Python implementation of BM25.
 * `bm25_pt` (`PT`): A Pytorch implementation of BM25.
 * `elasticsearch` (`ES`): Elasticsearch with BM25 configurations.
@@ -386,16 +595,17 @@ More detailed benchmarks can be found in the [bm25-benchmarks repo](https://gith
 
 ### Disk usage
 
-`bm25s` is designed to be lightweight. This means the total disk usage of the package is minimal, as it only requires wheels for `numpy` (18MB), `scipy` (37MB), and the package itself is less than 100KB. After installation, the full virtual environment takes more space than `rank-bm25` but less than `pyserini` and `bm25_pt`:
+`bm25s` is designed to be lightweight. This means the total disk usage of the package is minimal, as it only requires wheels for `numpy` (18MB), and the package itself is less than 100KB. After installation, the full virtual environment takes more space than `rank-bm25` but less than `pyserini` and `bm25_pt`:
 
 | Package           | Disk Usage |
 | ----------------- | ---------- |
-| venv (no package) | 45MB       |
-| `rank-bm25`       | 99MB       |
-| `bm25s` (ours)    | 479MB      |
+| venv (no package) | 21MB       |
+| `bm25s` (ours)    | 51MB       |
+| `rank-bm25`       | 51MB       |
+| `bm25s` (w/ core) | 188MB      |
+| `elastic`         | 1183MB     |
 | `bm25_pt`         | 5346MB     |
 | `pyserini`        | 6976MB     |
-| `elastic`         | 1183MB     |
 
 <details>
 <summary>Show Details</summary>
@@ -403,12 +613,13 @@ More detailed benchmarks can be found in the [bm25-benchmarks repo](https://gith
 The disk usage of the virtual environments is calculated using the following command:
 
 ```
-$ du -s *env-* --block-size=1MB
+$ du -sh venv* --block-size=1MB
 6976    conda-env-pyserini
 5346    venv-bm25-pt
-479     venv-bm25s
-45      venv-empty
-99      venv-rank-bm25
+51     venv-bm25s
+188     venv-bm25s-core
+21      venv-empty
+51      venv-rank-bm25
 ```
 
 For `pyserini`, we use the [recommended installation](https://github.com/castorini/pyserini/blob/master/docs/installation.md) with conda environment to account for Java dependencies.

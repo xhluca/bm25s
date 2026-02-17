@@ -1,0 +1,4 @@
+hello world
+this is a test
+bm25s is fast
+

@@ -14,7 +14,10 @@ extras_require = {
     "hf": ["huggingface_hub"],
     "dev": ["black"],
     "selection": ["jax[cpu]"],
+    "indexing": ["scipy"],
     "evaluation": ["pytrec_eval"],
+    "mcp": ["mcp"],
+    "cli": ["rich"],
 }
 # Dynamically create the 'full' extra by combining all other extras
 extras_require["full"] = sum(extras_require.values(), [])
@@ -29,7 +32,12 @@ setup(
     long_description=long_description,
     packages=find_packages(include=[f"{package_name}*"]),
     package_data={},
-    install_requires=['scipy', 'numpy'],
+    install_requires=['numpy'],
+    entry_points={
+        "console_scripts": [
+            "bm25=bm25s.cli:main",
+        ],
+    },
     extras_require=extras_require,
     classifiers=[
         "Programming Language :: Python :: 3",

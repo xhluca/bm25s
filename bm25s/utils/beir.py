@@ -3,12 +3,17 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-try:
-    from tqdm.auto import tqdm
-except ImportError:
+import os
 
-    def tqdm(iterable, *args, **kwargs):
-        return iterable
+def _faketqdm(*args, **kwargs):
+    return args[0] if len(args) > 0 else None
+try:
+    if os.environ.get("DISABLE_TQDM", False):
+        tqdm = _faketqdm
+    else:
+        from tqdm.auto import tqdm
+except ImportError:
+    tqdm = _faketqdm
 
 
 from . import json_functions
