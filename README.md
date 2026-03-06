@@ -139,6 +139,9 @@ For an example that shows how to quickly index a 2M-documents corpus (Natural Qu
 
 ## High Level API
 
+> [!TIP]
+> **New:** We now recommend using the [**`BM25`** package on PyPI](https://pypi.org/project/BM25/) for a simpler, beginner-friendly experience. It includes all necessary dependencies (stemming, CLI, etc.) and provides the same high-level API shown below.
+
 If you want to quickly search on a local file, you can use the `bm25s.high_level` module:
 
 ```python
