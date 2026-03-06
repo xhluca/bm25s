@@ -41,6 +41,10 @@ jobs:
     - name: Build package
       run: |
         python setup.py sdist bdist_wheel
+        cd bm25s/high_level
+        python setup.py sdist bdist_wheel
+        cp -r dist/* ../../dist/
+        cd ../..
     
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1

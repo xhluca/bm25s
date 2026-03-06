@@ -9,8 +9,8 @@ enabling 1-line indexing and 1-line searching. By default, it will require:
 import json
 import csv
 from pathlib import Path
-from . import BM25
-from .tokenization import Tokenizer
+from bm25s import BM25
+from bm25s.tokenization import Tokenizer
 import Stemmer
 from typing import List
 
