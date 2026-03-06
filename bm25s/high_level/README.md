@@ -2,7 +2,7 @@
 
 <h1>BM25</h1>
 
-<i>A fast, simple, and high-level Python API and CLI for BM25, powered by `bm25s`.</i>
+<i>The easiest way to add powerful search to your Python projects or command line.</i>
 
 <table>
       <tr>
@@ -10,7 +10,7 @@
                   <a href="https://github.com/xhluca/bm25s">💻 GitHub</a>
             </td>
             <td>
-                  <a href="https://pypi.org/project/bm25s/">📦 bm25s</a>
+                  <a href="https://pypi.org/project/BM25/">📦 PyPI</a>
             </td>
             <td>
                   <a href="https://bm25s.github.io">🏠 Homepage</a>
@@ -19,132 +19,84 @@
 </table>
 </div>
 
-`BM25` is a wrapper package that installs `bm25s` with its optional core dependencies, providing a simple, high-level API and a command-line interface for fast and effective text retrieval.
+**BM25** is a famous algorithm used by search engines (like Elasticsearch) to find the most relevant documents for a given search query. It works by matching keywords and scoring documents based on how often those words appear.
 
-## Installation
+This package provides a dead-simple, beginner-friendly way to use BM25 in Python. Under the hood, it is powered by [`bm25s`](https://github.com/xhluca/bm25s), an ultra-fast, highly optimized library. By installing `BM25`, you get all the performance benefits of `bm25s` (including speedups and stemming) with a streamlined, 1-line API and a beautiful command-line interface.
 
-Install `BM25` using pip:
+## 🛠️ Installation
+
+Get started in seconds with pip:
 
 ```bash
 pip install BM25
 ```
 
-This will automatically install the highly optimized `bm25s` backend, alongside necessary dependencies for stemming (`PyStemmer`), parallelization, and CLI (`rich`).
+*This automatically installs the optimized `bm25s` backend, along with necessary dependencies for better search quality (`PyStemmer`) and a colorful terminal experience (`rich`).*
 
-## High Level API
+## 🐍 Python API: 1-Line Search
 
-If you want to quickly search on a local file, you can use the `BM25` module:
+If you want to quickly build a search engine over a local file or a list of texts, the `BM25` module makes it incredibly easy.
 
 ```python
 import BM25
 
-# Load a file (csv, json, jsonl, txt)
-# For csv/jsonl, you can specify the column/key to use as document text
-corpus = BM25.load("tests/data/dummy.csv", document_column="text")
-# Index the corpus
+# 1. Load your documents (supports .csv, .json, .jsonl, .txt)
+# For csv/jsonl, you can specify which column/key holds the text
+corpus = BM25.load("documents.csv", document_column="text")
+
+# 2. Build the search index
 retriever = BM25.index(corpus)
 
-# Search
-results = retriever.search(["your query here"], k=5)
+# 3. Search!
+queries = ["how to learn python", "best search algorithms"]
+results = retriever.search(queries, k=5) # Get top 5 results
+
+# Print the top results for the first query
 for result in results[0]:
-    print(result)
+    print(f"Score: {result['score']:.2f} | Document: {result['document']}")
 ```
 
-The `load` function handles file reading, while `index` handles tokenization, indexing, and provides a simple search interface.
+The `load` function handles reading your files, while `index` automatically takes care of text processing (tokenization, stemming) and creating the searchable index.
 
-## Command-Line Interface
+## 💻 Command-Line Interface (CLI)
 
-The package provides a terminal-based CLI for quick indexing and searching without writing Python code.
+Don't want to write code? The `BM25` package comes with a built-in terminal app for instant indexing and searching.
 
-### Indexing Documents
-
-Create an index from a CSV, TXT, JSON, or JSONL file:
+### Step 1: Index your documents
+Turn any text, CSV, or JSON file into a search index.
 
 ```bash
-# Index a CSV file (uses first column by default)
-bm25 index documents.csv -o my_index
-
-# Index with a specific column
-bm25 index documents.csv -o my_index -c text
-
-# Index a text file (one document per line)
+# Index a simple text file (one document per line)
 bm25 index documents.txt -o my_index
 
-# Index a JSONL file
-bm25 index documents.jsonl -o my_index -c content
+# Index a CSV file using a specific column for the text
+bm25 index documents.csv -o my_index -c text
 ```
 
-If you don't specify an output directory with `-o`, the index will be saved to `<filename>_index`.
-
-### User Directory
-
-You can save indices to a central user directory (`~/.bm25s/indices/`) using the `-u` flag:
-
-```bash
-# Save index to ~/.bm25s/indices/my_docs
-bm25 index documents.csv -u -o my_docs
-
-# Search using the user directory
-bm25 search -u -i my_docs "your query"
-```
-
-### Searching
-
-Search an existing index with a query using `-i` (or `--index`):
+### Step 2: Search
+Query your newly created index directly from the terminal.
 
 ```bash
 # Basic search (returns top 10 results)
 bm25 search -i my_index "what is machine learning?"
 
-# Search with full path
-bm25 search -i ./path/to/my_index "your query here"
-
-# Return more results
-bm25 search -i my_index "your query here" -k 20
-
-# Save results to a JSON file
-bm25 search -i my_index "your query here" -s results.json
+# Return more results and save them to a file
+bm25 search -i my_index "your query here" -k 20 -s results.json
 ```
 
-### Interactive Index Picker
-
-When using `-u` without specifying an index name, an interactive picker is displayed (requires `bm25s[cli]` which is installed by default with `BM25`):
-
-```bash
-# Interactive picker will show available indices
-bm25 search -u "your query"
-```
-
-### Example Workflow
-
-**Basic usage** (index saved to current directory):
+### 🌟 Pro-tip: The User Directory
+You can save indices to a central user directory (`~/.bm25s/indices/`) so you can search them from anywhere on your computer without remembering file paths.
 
 ```bash
-# 1. Create a simple text file with documents
-echo -e "Machine learning is a subset of AI\nDeep learning uses neural networks\nNatural language processing handles text" > docs.txt
+# Save to the central directory using the -u flag
+bm25 index documents.csv -u -o my_docs
 
-# 2. Index the documents
-bm25 index docs.txt -o my_index
-
-# 3. Search the index
-bm25 search -i my_index "what is AI?"
-```
-
-**With user directory** (indices saved to `~/.bm25s/indices/`):
-
-```bash
-# Index to user directory
-bm25 index docs.txt -u -o ml_docs
-
-# Search from user directory
-bm25 search -u -i ml_docs "what is AI?"
-
-# Or use the interactive picker
+# Search interactively! Just type this, and a menu will let you pick your index:
 bm25 search -u "what is AI?"
 ```
 
-## Flexibility
+## 🚀 Going Further
 
-For more advanced use cases, including memory mapping, customized tokenization, hugging face integration, or using different BM25 variants, please use the underlying `bm25s` API directly. 
+The `BM25` package is designed to be simple and get out of your way. But if you find yourself needing more advanced features—like saving/loading models, integrating with Hugging Face, tweaking the math behind the algorithm, or handling massive millions-of-documents datasets—you already have the tools!
 
-See the [bm25s documentation](https://github.com/xhluca/bm25s) for full details.
+You can drop down to the underlying `bm25s` library anytime. Check out the [bm25s documentation](https://github.com/xhluca/bm25s) for full details on advanced usage.
