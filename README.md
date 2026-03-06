@@ -72,17 +72,18 @@ You can install `bm25s` with pip:
 pip install bm25s
 ```
 
-If you want to use stemming for better results, you can install the recommended (but optional) dependencies:
+You can install the recommended (but optional) dependencies:
 
 ```bash
+# HIGHLY RECOMMENDED: To install all core dependencies (json loading, progress bar, stemming, JIT compilation)
+pip install "bm25s[core]"
+
+# If you just want to use stemming for better results, you can install a stemmer
+pip install PyStemmer
+
 # Install all extra dependencies
 pip install "bm25s[full]"
 
-# If you want to use stemming for better results, you can install a stemmer
-pip install PyStemmer
-
-# To speed up the top-k selection process, you can install `jax`
-pip install "jax[cpu]"
 ```
 
 ## Quickstart
@@ -138,6 +139,9 @@ reloaded_retriever = bm25s.BM25.load("animal_index_bm25", load_corpus=True)
 For an example that shows how to quickly index a 2M-documents corpus (Natural Questions), check out [`examples/index_nq.py`](examples/index_nq.py).
 
 ## High Level API
+
+> [!TIP]
+> **New:** We now recommend using the [**`BM25`** package on PyPI](https://pypi.org/project/BM25/) for a simpler, beginner-friendly experience. It includes all necessary dependencies (stemming, CLI, etc.) and provides the same high-level API shown below.
 
 If you want to quickly search on a local file, you can use the `bm25s.high_level` module:
 
