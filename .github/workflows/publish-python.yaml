@@ -38,13 +38,21 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
     
-    - name: Build package
+    - name: Build bm25s
       run: |
         python setup.py sdist bdist_wheel
+    
+    - name: Publish bm25s to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: dist/
+
+    - name: Build BM25
+      run: |
         cd bm25s/high_level
         python setup.py sdist bdist_wheel
-        cp -r dist/* ../../dist/
-        cd ../..
     
-    - name: Publish package distributions to PyPI
+    - name: Publish BM25 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: bm25s/high_level/dist/
