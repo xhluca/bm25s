@@ -6,15 +6,10 @@ import sys
 current_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_dir)
 
-import re
-
 package_name = "BM25"
 version = {}
 with open(os.path.join("..", "version.py"), encoding="utf8") as fp:
     exec(fp.read(), version)
-
-# Base version without post/dev suffixes, used for the bm25s dependency
-base_version = re.sub(r'\.(post|dev)\d+$', '', version["__version__"])
 
 with open("README.md", encoding="utf8") as fp:
     long_description = fp.read()
@@ -31,7 +26,7 @@ setup(
     packages=["BM25"],
     package_dir={"BM25": "."},
     install_requires=[
-        f"bm25s[core,cli]=={base_version}",
+        f"bm25s[core,cli]=={version['__version__']}",
     ],
     entry_points={
         "console_scripts": [
