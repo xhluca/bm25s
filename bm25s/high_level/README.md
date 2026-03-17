@@ -13,7 +13,7 @@
                   <a href="https://pypi.org/project/BM25/">📦 PyPI</a>
             </td>
             <td>
-                  <a href="https://bm25s.github.io">🏠 Homepage</a>
+                  <a href="https://bm25-python.github.io">🏠 Homepage</a>
             </td>
       </tr>
 </table>
