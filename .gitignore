@@ -183,3 +183,6 @@ bm25s_indices/
 # Ignore test indices
 test_index/
 test_index_mcp/
+
+# Pages build output
+_site/

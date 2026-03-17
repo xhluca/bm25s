@@ -1,0 +1,42 @@
+name: Deploy Homepage to GitHub Pages
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths:
+      - "bm25s/high_level/README.md"
+      - ".github/scripts/build_pages.py"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    name: Build and deploy to bm25-python.github.io
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install markdown pymdown-extensions
+
+      - name: Build HTML from README
+        run: python .github/scripts/build_pages.py
+
+      - name: Deploy to bm25-python.github.io
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.PAGES_DEPLOY_KEY }}
+          external_repository: bm25-python/bm25-python.github.io
+          publish_branch: main
+          publish_dir: ./_site
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_message: "Update site from bm25s release ${{ github.event.release.tag_name }}"
