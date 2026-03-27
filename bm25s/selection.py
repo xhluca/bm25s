@@ -2,7 +2,7 @@ import numpy as np
 
 try:
     import jax.lax
-except ImportError:
+except (ImportError, RuntimeError):
     JAX_IS_AVAILABLE = False
 else:
     JAX_IS_AVAILABLE = True
