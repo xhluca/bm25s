@@ -182,10 +182,12 @@ class BM25:
         int_dtype : str
             The data type of the indices in the BM25 scores.
 
-        corpus : Iterable[Dict]
+        corpus : list of str, list of dict, or any JSON-serializable iterable
             The corpus of documents. This is optional and is used for saving the corpus
-            to the snapshot. We expect the corpus to be a list of dictionaries, where each
-            dictionary represents a document.
+            to the snapshot and for returning documents during retrieval. The corpus can
+            be a list of strings, a list of dictionaries, or any list of JSON-serializable
+            objects. The index of each element in the corpus is used to map retrieval
+            results back to the original documents.
 
         backend : str
             The backend used during retrieval. By default, it uses the numpy backend, which
@@ -690,11 +692,12 @@ class BM25:
             List of list of tokens for each query. If a Tokenized object is provided,
             it will be converted to a list of list of tokens.
 
-        corpus : List[str] or np.ndarray
+        corpus : list of str, list of dict, np.ndarray, or any iterable
             List of "documents" or a numpy array of documents. If provided, the function
-            will return the documents instead of the indices. You do not have to provide
-            the original documents (for example, you can provide the unique IDs of the
-            documents here and then retrieve the actual documents from another source).
+            will return the documents instead of the indices. Each element can be a string,
+            a dictionary, or any object. You do not have to provide the original documents
+            (for example, you can provide the unique IDs of the documents here and then
+            retrieve the actual documents from another source).
 
         k : int
             Number of documents to retrieve for each query.
