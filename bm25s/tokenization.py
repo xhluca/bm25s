@@ -32,6 +32,7 @@ from .stopwords import (
     STOPWORDS_NORWEGIAN,
     STOPWORDS_CHINESE,
     STOPWORDS_TURKISH,
+    STOPWORDS_KOREAN
 )
 
 
@@ -522,6 +523,7 @@ def convert_tokenized_to_string_list(tokenized: Tokenized) -> List[List[str]]:
 
 def _infer_stopwords(stopwords: Union[str, List[str]]) -> Union[List[str], tuple]:
     # Source of stopwords: https://github.com/nltk/nltk/blob/96ee715997e1c8d9148b6d8e1b32f412f31c7ff7/nltk/corpus/__init__.py#L315
+    # Source of Korean stopwords: https://github.com/stopwords-iso/stopwords-ko (as nltk did not have Korean stopwords)
     if stopwords in ["english", "en", True]:  # True is added to support the default
         return STOPWORDS_EN
     elif stopwords in ["english_plus", "en_plus"]:
@@ -548,11 +550,13 @@ def _infer_stopwords(stopwords: Union[str, List[str]]) -> Union[List[str], tuple
         return STOPWORDS_CHINESE
     elif stopwords in ["turkish", "tr"]:
         return STOPWORDS_TURKISH
+    elif stopwords in ["korean", "ko"]:
+        return STOPWORDS_KOREAN
     elif stopwords in [None, False]:
         return []
     elif isinstance(stopwords, str):
         raise ValueError(
-            f"{stopwords} not recognized. Only English stopwords as default, German, Dutch, French, Spanish, Portuguese, Italian, Russian, Swedish, Norwegian, Chinese and Turkish are currently supported. "
+            f"{stopwords} not recognized. Only English stopwords as default, German, Dutch, French, Spanish, Portuguese, Italian, Russian, Swedish, Norwegian, Chinese, Turkish, and Korean are currently supported. "
             "Please input a list of stopwords"
         )
     else:
