@@ -942,6 +942,7 @@ class BM25:
         nnoc_name="nonoccurrence_array.index.npy",
         corpus_name="corpus.jsonl",
         allow_pickle=False,
+        show_progress=True
     ):
         """
         Save the BM25S index to the `save_dir` directory. This will save the scores array,
@@ -979,6 +980,9 @@ class BM25:
         allow_pickle : bool
             If True, the arrays will be saved using pickle. If False, the arrays will be saved
             in a more efficient format, but they will not be readable by older versions of numpy.
+
+        show_progress : bool
+            If True, a progress bar will be shown. If False, no progress bar will be shown.
         """
         # Save the self.vocab_dict and self.score_matrix to the save_dir
         save_dir = Path(save_dir)
@@ -1050,7 +1054,7 @@ class BM25:
                         f.write(doc_str + "\n")
 
             # also save corpus.mmindex
-            mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name)
+            mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name, show_progress=show_progress)
             utils.corpus.save_mmindex(mmidx, path=save_dir / corpus_name)
 
     def load_scores(
