@@ -1,11 +1,14 @@
 from copy import deepcopy
+import logging
 import time
 import sys
+
+logger = logging.getLogger(__name__)
 
 try:
     import resource
 except ImportError:
-    print("resource module not available on Windows")
+    logger.warning("resource module not available on Windows")
     resource = None
 
 
