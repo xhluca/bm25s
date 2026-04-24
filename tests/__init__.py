@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 
 import bm25s
+from bm25s.utils.beir import BASE_URL
 
 
 # Make sure to import or define the functions/classes you're going to use,
@@ -54,10 +55,7 @@ class BM25TestCase(unittest.TestCase):
             raise ValueError("method must be either 'rank' or 'bm25+'.")
 
         # Download and prepare dataset
-        base_url = (
-            "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip"
-        )
-        url = base_url.format(dataset)
+        url = BASE_URL.format(dataset)
         out_dir = Path(__file__).parent / rel_save_dir
         data_path = download_and_unzip(url, str(out_dir))
 
@@ -191,10 +189,7 @@ class BM25TestCase(unittest.TestCase):
         warnings.filterwarnings("ignore", category=UserWarning)
 
         # Download and prepare dataset
-        base_url = (
-            "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip"
-        )
-        url = base_url.format(dataset)
+        url = BASE_URL.format(dataset)
         out_dir = Path(__file__).parent / rel_save_dir
         data_path = download_and_unzip(url, str(out_dir))
 
