@@ -18,8 +18,8 @@ except ImportError:
 
 from . import json_functions
 
-BASE_URL = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip"
 GH_URL = "https://github.com/xhluca/bm25s/releases/download/data/{}.zip"
+BASE_URL = GH_URL
 
 
 def clean_results_keys(beir_results):
@@ -132,6 +132,7 @@ def download_dataset(
     show_progress=True,
 ):
     import urllib.request
+    import urllib.error
     import zipfile
     from pathlib import Path
     from tqdm.auto import tqdm
@@ -144,20 +145,18 @@ def download_dataset(
     save_zip_path = save_dir / "archive" / f"{dataset}.zip"
     save_zip_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if not save_zip_path.exists() or redownload:
-        # download the zip file and save it with tqdm progress bar
+    def download_file(src_url, dst_path, desc):
         pbar = tqdm(
             unit="B",
             unit_scale=True,
-            desc=f"Downloading {dataset}",
+            desc=desc,
             leave=False,
             disable=not show_progress,
         )
-        with open(save_zip_path, "wb") as f:
-            response = urllib.request.urlopen(url)
+        with open(dst_path, "wb") as f:
+            response = urllib.request.urlopen(src_url)
             total_size = int(response.headers.get("content-length", 0))
             block_size = 8192 * 2
-            # set the tqdm total to the total size
             pbar.total = total_size
             while True:
                 buffer = response.read(block_size)
@@ -167,6 +166,52 @@ def download_dataset(
                 pbar.update(len(buffer))
 
         pbar.close()
+
+    def download_multipart_release(dataset_url, dst_path):
+        part_paths = []
+        for part_idx in range(1000):
+            part_path = dst_path.parent / f"{dst_path.name}.part-{part_idx:03d}"
+            part_url = f"{dataset_url}.part-{part_idx:03d}"
+            try:
+                download_file(
+                    part_url, part_path, f"Downloading {dataset} part {part_idx:03d}"
+                )
+            except urllib.error.HTTPError as exc:
+                if part_path.exists():
+                    part_path.unlink()
+                if exc.code == 404 and part_idx > 0:
+                    break
+                raise
+            part_paths.append(part_path)
+
+        if not part_paths:
+            raise FileNotFoundError(
+                f"No release assets found for dataset {dataset} at {dataset_url}"
+            )
+
+        with open(dst_path, "wb") as f_out:
+            for part_path in tqdm(
+                part_paths,
+                desc=f"Assembling {dataset}",
+                leave=False,
+                disable=not show_progress,
+            ):
+                with open(part_path, "rb") as f_in:
+                    while True:
+                        chunk = f_in.read(8192 * 2)
+                        if not chunk:
+                            break
+                        f_out.write(chunk)
+                part_path.unlink()
+
+    if not save_zip_path.exists() or redownload:
+        try:
+            download_file(url, save_zip_path, f"Downloading {dataset}")
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                download_multipart_release(url, save_zip_path)
+            else:
+                raise
 
     # now that we have the zip file, extract it
     if unzip:

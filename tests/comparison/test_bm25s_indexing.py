@@ -12,6 +12,7 @@ from beir.util import download_and_unzip
 import Stemmer
 
 import bm25s
+from bm25s.utils.beir import BASE_URL
 
 def check_scores_all_close(score1, score2, **kwargs):
     for key in score1.keys():
@@ -36,10 +37,7 @@ class BM25SIndexing(unittest.TestCase):
         dataset = "scifact"
         rel_save_dir = "datasets"
         # Download and prepare dataset
-        base_url = (
-            "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip"
-        )
-        url = base_url.format(dataset)
+        url = BASE_URL.format(dataset)
         out_dir = Path(__file__).parent / rel_save_dir
         data_path = download_and_unzip(url, str(out_dir))
 
