@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/xhluca-bm25s-badge.png)](https://mseep.ai/app/xhluca-bm25s)
+
 <div align="center">
 
 <h1>BM25S⚡</h1>
