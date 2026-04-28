@@ -136,6 +136,44 @@ reloaded_retriever = bm25s.BM25.load("animal_index_bm25", load_corpus=True)
 # set load_corpus=False if you don't need the corpus
 ```
 
+### Corpus Format
+
+`bm25s` separates the text you index from the values you get back. Pass
+strings to `bm25s.tokenize()`, then pass the resulting tokenized corpus to
+`retriever.index()`. The optional `corpus` argument on `BM25(...)`,
+`retrieve(...)`, and `save(...)` is the list of values returned for matching
+document IDs.
+
+Both plain strings and dictionaries are valid corpus entries:
+
+```python
+text_corpus = [
+    "a cat is a feline and likes to purr",
+    "a dog is the human's best friend and loves to play",
+]
+
+metadata_corpus = [
+    {"id": "cat-doc", "title": "About Cat", "text": text_corpus[0]},
+    {"id": "dog-doc", "title": "About Dog", "text": text_corpus[1]},
+]
+
+# Pick the text field(s) you want to index.
+corpus_tokens = bm25s.tokenize([doc["text"] for doc in metadata_corpus])
+
+# Retrieved documents will be the original dictionary entries.
+retriever = bm25s.BM25(corpus=metadata_corpus)
+retriever.index(corpus_tokens)
+```
+
+Dictionaries do not have required keys; use the shape that fits your
+application, such as `id`, `title`, `text`, or nested metadata. Retrieval is
+position-based, so `corpus[i]` is returned for document ID `i`. Keep the corpus
+you pass to `BM25(...)`, `retrieve(...)`, or `save(...)` in the same order and
+length as the indexed documents. When saving, entries must be strings,
+dictionaries, lists, or tuples that can be serialized to JSON. String entries
+are written to `corpus.jsonl` as `{"id": i, "text": doc}`; dictionaries, lists,
+and tuples are written as provided.
+
 For an example that shows how to quickly index a 2M-documents corpus (Natural Questions), check out [`examples/index_nq.py`](examples/index_nq.py).
 
 ## High Level API
