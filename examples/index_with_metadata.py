@@ -1,10 +1,11 @@
 """
-Sometimes, you might want to have a corpus consisting of dict rather than pure text.
+Use dictionary corpus entries when retrieval should return metadata instead of
+plain text.
 
-dicts, and any json-serializable object, is supported by bm25s. This example shows you how to pass a list of dict.
-
-Note: If the elements in your corpus is not json serializable, it will not be properly saved. In those cases, you 
-should avoid passing 
+bm25s indexes by list position: the tokenized text at position i corresponds to
+the corpus entry at position i. Dictionary keys are user-defined. If you save the
+corpus with the index, entries must be strings, dictionaries, lists, or tuples
+that can be serialized to JSON.
 """
 import bm25s
 
@@ -42,7 +43,7 @@ for i in range(results.shape[1]):
     print(f"Rank {i+1} (score: {score:.2f}): {doc}")
 
 # You can save the arrays to a directory...
-# Note that this will fail if your corpus passed to `BM25(corpus...)` is not serializable
+# Note that this will fail if your corpus passed to `BM25(corpus=...)` is not serializable
 retriever.save("animal_index_bm25")
 
 # ...and load them when you need them
