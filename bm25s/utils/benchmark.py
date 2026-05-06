@@ -14,6 +14,7 @@ except ImportError:
 
 def get_max_memory_usage(format="GB"):
     if resource is None:
+        logger.warning("resource module not available, cannot get memory usage")
         return None
     if format not in ["GB", "MB", "KB"]:
         raise ValueError("format should be one of 'GB', 'MB', 'KB'")
