@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 try:
     import resource
 except ImportError:
-    logger.warning("resource module not available on Windows")
+    logger.debug("resource module not available on Windows")
     resource = None
 
 
