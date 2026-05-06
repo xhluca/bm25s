@@ -8,12 +8,13 @@ logger = logging.getLogger(__name__)
 try:
     import resource
 except ImportError:
-    logger.warning("resource module not available on Windows")
+    logger.debug("resource module not available on Windows")
     resource = None
 
 
 def get_max_memory_usage(format="GB"):
     if resource is None:
+        logger.warning("resource module not available, cannot get memory usage")
         return None
     if format not in ["GB", "MB", "KB"]:
         raise ValueError("format should be one of 'GB', 'MB', 'KB'")
