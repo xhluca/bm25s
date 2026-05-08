@@ -29,7 +29,7 @@ class TestBenchmarkUtils(unittest.TestCase):
             self.assertIsNone(benchmark.resource)
             self.assertIsNone(benchmark.get_max_memory_usage())
             mock_logger.warning.assert_called_once_with(
-                "resource module not available on Windows"
+                "resource module not available, cannot get memory usage"
             )
         finally:
             importlib.reload(benchmark)
