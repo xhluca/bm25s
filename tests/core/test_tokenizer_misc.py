@@ -68,10 +68,9 @@ class TestBM25SNewIds(unittest.TestCase):
         self.assertListEqual([[27, 2, 0, 28]], query_tokens)
 
         results, scores = bm25.retrieve(query_tokens, k=3)
-        self.assertTrue(
-            np.all(np.array([[0, 2, 3]]) == results),
-            msg=f"Results differ from expected: {results}, {scores}",
-        )
+        self.assertEqual({0, 2}, set(results[0, :2]))
+        self.assertEqual(3, results[0, 2])
+        np.testing.assert_allclose(scores[0, 0], scores[0, 1])
 
     def test_failing_after_adding_new_tokens_query(self):
         corpus = [
