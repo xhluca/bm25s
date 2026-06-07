@@ -10,6 +10,14 @@ else:
     # any output to avoid it from saying that gpu is not available
     _ = jax.lax.top_k(np.array([0] * 5), 1)
 
+try:
+    from .cupy import selection as selection_cupy
+except ImportError:
+    selection_cupy = None
+    CUPY_IS_AVAILABLE = False
+else:
+    CUPY_IS_AVAILABLE = selection_cupy.CUPY_AVAILABLE
+
 
 def _topk_numpy(query_scores, k, sorted):
     # https://stackoverflow.com/questions/65038206/how-to-get-indices-of-top-k-values-from-a-numpy-array
@@ -54,11 +62,18 @@ def topk(query_scores, k, backend="auto", sorted=True):
         # if jax.lax is available, use it to speed up selection, otherwise use numpy
         backend = "jax" if JAX_IS_AVAILABLE else "numpy"
     
-    if backend not in ["numpy", "jax"]:
-        raise ValueError("Invalid backend. Please choose from 'numpy' or 'jax'.")
+    if backend not in ["numpy", "jax", "cupy"]:
+        raise ValueError("Invalid backend. Please choose from 'numpy', 'jax', or 'cupy'.")
     elif backend == "jax":
         if not JAX_IS_AVAILABLE:
             raise ImportError("JAX is not available. Please install JAX with `pip install jax[cpu]` to use this backend.")
         return _topk_jax(query_scores, k)
+    elif backend == "cupy":
+        if not CUPY_IS_AVAILABLE or selection_cupy is None:
+            raise ImportError(
+                "CuPy is not installed. Please install a CuPy package compatible "
+                "with your CUDA runtime to use this backend."
+            )
+        return selection_cupy.topk(query_scores, k, backend="cupy", sorted=sorted)
     else:
         return _topk_numpy(query_scores, k, sorted)

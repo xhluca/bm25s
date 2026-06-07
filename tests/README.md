@@ -17,6 +17,15 @@ For numba, you have to run:
 python -m unittest tests/numba/*.py
 ```
 
+For CuPy, install the CuPy package matching your CUDA runtime and run:
+
+```bash
+python -m unittest discover tests/cupy
+```
+
+On machines without CuPy or a CUDA runtime, the GPU behavior tests are skipped
+and the missing-dependency tests still run.
+
 
 ## Basic Comparisons
 
@@ -34,6 +43,7 @@ To run the core tests (of library), simply run the following command:
 python -m unittest tests/core/*.py
 python -m unittest tests/stopwords/*.py
 python -m unittest tests/numba/*.py
+python -m unittest discover tests/cupy
 python -m unittest tests/comparison/*.py
 ```
 

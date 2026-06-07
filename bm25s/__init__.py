@@ -19,6 +19,14 @@ try:
 except ImportError:
     njit = lambda x: x  # type: ignore
     NUMBA_AVAILABLE = False
+
+try:
+    from .cupy import selection as selection_cupy
+    CUPY_AVAILABLE = selection_cupy.CUPY_AVAILABLE
+except ImportError:
+    selection_cupy = None
+    CUPY_AVAILABLE = False
+
 try:
     import scipy.sparse as sp
     SCIPY_AVAILABLE = True
@@ -29,6 +37,11 @@ try:
     from .numba.retrieve_utils import _retrieve_numba_functional
 except ImportError:
     _retrieve_numba_functional = None
+
+try:
+    from .cupy.retrieve_utils import _retrieve_cupy_functional
+except ImportError:
+    _retrieve_cupy_functional = None
 
 
 def _faketqdm(*args, **kwargs):
@@ -193,9 +206,10 @@ class BM25:
         backend : str
             The backend used during retrieval. By default, it uses the numpy backend, which
             only requires numpy and scipy as dependencies. You can also select `backend="numba"`
-            to use the numba backend, which requires the numba library. If you select `backend="auto"`,
-            the function will use the numba backend if it is available, otherwise it will use the numpy
-            backend.
+            to use the numba backend, which requires the numba library, or `backend="cupy"`
+            to use the CuPy backend, which requires CuPy and a compatible CUDA runtime. If you
+            select `backend="auto"`, the function will use the numba backend if it is available,
+            otherwise it will use the numpy backend.
         
         csc_backend : str
             The backend used for constructing the CSC matrix. Choose from 'scipy' or 'numpy'. By default,
@@ -231,6 +245,11 @@ class BM25:
         if self.backend == "numba" and not NUMBA_AVAILABLE:
             raise ImportError(
                 "Numba is not installed. Please install numba with `pip install numba` to use the numba backend."
+            )
+
+        if self.backend == "cupy" and not CUPY_AVAILABLE:
+            raise ImportError(
+                "CuPy is not installed. Please install a CuPy package compatible with your CUDA runtime to use the cupy backend."
             )
         
         if csc_backend == "scipy" and not SCIPY_AVAILABLE:
@@ -663,6 +682,14 @@ class BM25:
             topk_scores, topk_indices = selection_jit.topk(
                 scores_q, k=k, sorted=sorted, backend=backend
             )
+        elif backend == "cupy":
+            if CUPY_AVAILABLE is False or selection_cupy is None:
+                raise ImportError(
+                    "CuPy is not installed. Please install a CuPy package compatible with your CUDA runtime to use this backend."
+                )
+            topk_scores, topk_indices = selection_cupy.topk(
+                scores_q, k=k, sorted=sorted, backend=backend
+            )
         else:
             topk_scores, topk_indices = selection_np.topk(
                 scores_q, k=k, sorted=sorted, backend=backend
@@ -840,6 +867,47 @@ class BM25:
                 raise ValueError(
                     "The length of the weight_mask must be the same as the length of the corpus."
                 )
+
+        if self.backend == "cupy":
+            if _retrieve_cupy_functional is None or not CUPY_AVAILABLE:
+                raise ImportError(
+                    "CuPy is not installed. Please install a CuPy package compatible with your CUDA runtime to use the cupy backend."
+                )
+
+            backend_selection = (
+                "cupy" if backend_selection == "auto" else backend_selection
+            )
+            if is_list_of_list_of_type(query_tokens, type_=int):
+                query_tokens_ids = query_tokens
+            elif is_list_of_list_of_type(query_tokens, type_=str):
+                query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
+            else:
+                raise ValueError(
+                    "The query_tokens must be a list of list of tokens (str for stemmed words, int for token ids matching corpus) or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
+                )
+
+            res = _retrieve_cupy_functional(
+                query_tokens_ids=query_tokens_ids,
+                scores=self.scores,
+                corpus=corpus,
+                k=k,
+                sorted=sorted,
+                return_as=return_as,
+                show_progress=show_progress,
+                leave_progress=leave_progress,
+                n_threads=n_threads,
+                chunksize=None,
+                backend_selection=backend_selection,
+                dtype=self.dtype,
+                int_dtype=self.int_dtype,
+                nonoccurrence_array=self.nonoccurrence_array,
+                weight_mask=weight_mask,
+            )
+
+            if return_as == "tuple":
+                return Results(documents=res[0], scores=res[1])
+            else:
+                return res
 
         if self.backend == "numba":
             if _retrieve_numba_functional is None:

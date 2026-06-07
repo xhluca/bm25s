@@ -84,6 +84,11 @@ pip install PyStemmer
 # Install all extra dependencies
 pip install "bm25s[full]"
 
+# For GPU retrieval, install the CuPy package that matches your CUDA runtime,
+# then select backend="cupy" or backend_selection="cupy" explicitly.
+# For example, with CUDA 12:
+pip install cupy-cuda12x
+
 ```
 
 ## Quickstart
@@ -175,6 +180,32 @@ are written to `corpus.jsonl` as `{"id": i, "text": doc}`; dictionaries, lists,
 and tuples are written as provided.
 
 For an example that shows how to quickly index a 2M-documents corpus (Natural Questions), check out [`examples/index_nq.py`](examples/index_nq.py).
+
+### Acceleration Backends
+
+The default `backend="numpy"` path keeps scoring and top-k selection on CPU.
+`backend="numba"` enables the existing Numba retrieval path when Numba is
+installed. `backend="cupy"` enables GPU retrieval with CuPy and returns the
+same NumPy-shaped documents and scores as the CPU backend:
+
+```python
+retriever = bm25s.BM25(corpus=corpus, backend="cupy")
+retriever.index(corpus_tokens)
+documents, scores = retriever.retrieve(query_tokens, k=10)
+```
+
+You can also keep CPU scoring and use CuPy only for top-k selection:
+
+```python
+documents, scores = retriever.retrieve(
+    query_tokens,
+    k=10,
+    backend_selection="cupy",
+)
+```
+
+`backend="auto"` still chooses Numba when available and otherwise falls back to
+NumPy; it does not select CuPy automatically.
 
 ## High Level API
 
