@@ -4,7 +4,6 @@ import tempfile
 import unittest
 
 import numpy as np
-import Stemmer
 
 import bm25s
 
@@ -34,8 +33,7 @@ class TestCuPyBackendRetrieve(unittest.TestCase):
             "a fish is a creature that lives in water and swims",
         ]
 
-        stemmer = Stemmer.Stemmer("english")
-        corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=stemmer)
+        corpus_tokens = bm25s.tokenize(corpus, stopwords="en")
 
         retriever = bm25s.BM25(method="bm25+", backend="cupy", corpus=corpus)
         retriever.index(corpus_tokens)
@@ -43,7 +41,6 @@ class TestCuPyBackendRetrieve(unittest.TestCase):
         cls.retriever = retriever
         cls.corpus = corpus
         cls.corpus_tokens = corpus_tokens
-        cls.stemmer = stemmer
         cls.tmpdirname = tempfile.mkdtemp()
 
     def test_a_save(self):
@@ -94,7 +91,7 @@ class TestCuPyBackendRetrieve(unittest.TestCase):
         )
 
         query = ["my cat loves to purr", "a fish likes swimming"]
-        query_tokens = bm25s.tokenize(query, stopwords="en", stemmer=self.stemmer)
+        query_tokens = bm25s.tokenize(query, stopwords="en")
 
         top_k = 2
         retrieved = retriever.retrieve(query_tokens, k=top_k, return_as="tuple")
@@ -152,7 +149,7 @@ class TestCuPyBackendRetrieve(unittest.TestCase):
         )
 
         query = ["my cat loves to purr", "a fish likes swimming"]
-        query_tokens = bm25s.tokenize(query, stopwords="en", stemmer=self.stemmer)
+        query_tokens = bm25s.tokenize(query, stopwords="en")
 
         top_k = 2
         retrieved = retriever.retrieve(query_tokens, k=top_k, return_as="tuple")
@@ -207,7 +204,7 @@ class TestCuPyBackendRetrieve(unittest.TestCase):
             )
 
             query = ["my cat loves to purr", "a fish likes swimming"]
-            query_tokens = bm25s.tokenize(query, stopwords="en", stemmer=self.stemmer)
+            query_tokens = bm25s.tokenize(query, stopwords="en")
 
             top_k = 2
             retrieved = retriever.retrieve(
