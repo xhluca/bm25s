@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 
 
@@ -23,13 +25,44 @@ def _topk_cupy(query_scores, k, sorted):
     cupy = _require_cupy()
 
     query_scores_gpu = cupy.asarray(query_scores)
+    query_scores_gpu, ind = _topk_cupy_gpu(query_scores_gpu, k, sorted)
+    return cupy.asnumpy(query_scores_gpu), cupy.asnumpy(ind)
+
+
+def _topk_cupy_gpu(query_scores_gpu, k, sorted):
+    cupy = _require_cupy()
+
+    query_scores_gpu = cupy.asarray(query_scores_gpu)
     n_scores = int(query_scores_gpu.shape[0])
     if k > n_scores:
         k = n_scores
 
     if k == 0:
-        scores_dtype = np.asarray(query_scores).dtype
-        return np.empty(0, dtype=scores_dtype), np.empty(0, dtype=np.int64)
+        return (
+            cupy.empty(0, dtype=query_scores_gpu.dtype),
+            cupy.empty(0, dtype=cupy.int64),
+        )
+
+    if os.environ.get("BM25S_CUPY_TOPK_MODE", "sort") == "sort":
+        return _topk_cupy_sort_gpu(query_scores_gpu, k, sorted)
+
+    return _topk_cupy_partition_gpu(query_scores_gpu, k, sorted)
+
+
+def _topk_cupy_sort_gpu(query_scores_gpu, k, sorted):
+    cupy = _require_cupy()
+
+    order = cupy.argsort(query_scores_gpu)
+    ind = order[-k:]
+    if sorted:
+        ind = ind[::-1]
+
+    query_scores_gpu = cupy.take(query_scores_gpu, ind)
+    return query_scores_gpu, ind
+
+
+def _topk_cupy_partition_gpu(query_scores_gpu, k, sorted):
+    cupy = _require_cupy()
 
     partitioned_ind = cupy.argpartition(query_scores_gpu, -k)
     partitioned_ind = partitioned_ind.take(indices=range(-k, 0))
@@ -43,7 +76,7 @@ def _topk_cupy(query_scores, k, sorted):
         ind = partitioned_ind
         query_scores_gpu = partitioned_scores
 
-    return cupy.asnumpy(query_scores_gpu), cupy.asnumpy(ind)
+    return query_scores_gpu, ind
 
 
 def topk(query_scores, k, backend="cupy", sorted=True):

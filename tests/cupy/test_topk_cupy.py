@@ -3,6 +3,8 @@ import unittest
 import numpy as np
 
 from bm25s.cupy.selection import topk as cupy_topk
+from bm25s.cupy.selection import _topk_cupy_gpu
+from bm25s.cupy.selection import _topk_cupy_sort_gpu
 from bm25s.selection import topk as public_topk
 
 
@@ -56,6 +58,38 @@ class TestTopKSingleQueryCuPy(unittest.TestCase):
             self.scores, self.k, backend="cupy", sorted=True
         )
         self.check_results(result_scores, result_indices, sorted=True)
+
+    def test_topk_cupy_gpu_keeps_results_on_device(self):
+        import cupy as cp
+
+        scores_gpu = cp.asarray(self.scores)
+        result_scores, result_indices = _topk_cupy_gpu(
+            scores_gpu, self.k, sorted=True
+        )
+
+        self.assertIsInstance(result_scores, cp.ndarray)
+        self.assertIsInstance(result_indices, cp.ndarray)
+        self.check_results(
+            cp.asnumpy(result_scores),
+            cp.asnumpy(result_indices),
+            sorted=True,
+        )
+
+    def test_topk_cupy_sort_gpu_matches_numpy_sorted_topk(self):
+        import cupy as cp
+
+        scores_gpu = cp.asarray(self.scores)
+        result_scores, result_indices = _topk_cupy_sort_gpu(
+            scores_gpu, self.k, sorted=True
+        )
+
+        self.assertIsInstance(result_scores, cp.ndarray)
+        self.assertIsInstance(result_indices, cp.ndarray)
+        self.check_results(
+            cp.asnumpy(result_scores),
+            cp.asnumpy(result_indices),
+            sorted=True,
+        )
 
 
 if __name__ == "__main__":

@@ -73,6 +73,15 @@ class TestBM25SUtilityFunctions(unittest.TestCase):
         self.assertIn("foo", unique)
         self.assertIn("bar", unique)
 
+    def test_get_tokens_ids_keeps_zero_id_and_drops_unknown_tokens(self):
+        retriever = bm25s.BM25()
+        retriever.vocab_dict = {"known-zero": 0, "known-one": 1}
+
+        self.assertEqual(
+            retriever.get_tokens_ids(["known-zero", "missing", "known-one"]),
+            [0, 1],
+        )
+
     def test_faketqdm_when_tqdm_disabled(self):
         """Test that fake tqdm works when DISABLE_TQDM is set"""
         # Save original value

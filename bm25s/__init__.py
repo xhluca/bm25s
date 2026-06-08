@@ -590,8 +590,11 @@ class BM25:
         For a given list of tokens, return the list of token IDs, leaving out tokens
         that are not in the vocabulary.
         """
+        vocab_get = self.vocab_dict.get
         return [
-            self.vocab_dict[token] for token in query_tokens if token in self.vocab_dict
+            token_id
+            for token in query_tokens
+            if (token_id := vocab_get(token)) is not None
         ]
 
     def get_scores_from_ids(
