@@ -66,6 +66,13 @@ def _build_idf_array(
     n_vocab = len(doc_frequencies)
     idf_array = np.zeros(n_vocab, dtype=dtype)
 
+    if isinstance(doc_frequencies, np.ndarray):
+        # doc_frequencies given as an array indexed by token ID: compute the
+        # idf for all tokens with a nonzero document frequency in one shot
+        nonzero = doc_frequencies != 0
+        idf_array[nonzero] = compute_idf_fn(doc_frequencies[nonzero], N=n_docs)
+        return idf_array
+
     for token_id, df in doc_frequencies.items():
         if df != 0:
             idf_array[token_id] = compute_idf_fn(df, N=n_docs)
@@ -100,6 +107,16 @@ def _build_nonoccurrence_array(
     """
     n_vocab = len(doc_frequencies)
     nonoccurrence_array = np.zeros(n_vocab, dtype=dtype)
+
+    if isinstance(doc_frequencies, np.ndarray):
+        # doc_frequencies given as an array indexed by token ID: vectorized path
+        nonzero = doc_frequencies != 0
+        idf = compute_idf_fn(doc_frequencies[nonzero], N=n_docs)
+        tfc = calculate_tfc_fn(
+            tf_array=0, l_d=l_d, l_avg=l_avg, k1=k1, b=b, delta=delta
+        )
+        nonoccurrence_array[nonzero] = idf * tfc
+        return nonoccurrence_array
 
     for token_id, df in doc_frequencies.items():
         if df != 0:
@@ -181,10 +198,10 @@ def _score_idf_robertson(df, N, allow_negative=False):
     Implementation: https://cs.uwaterloo.ca/~jimmylin/publications/Kamphuis_etal_ECIR2020_preprint.pdf
     """
     inner = (N - df + 0.5) / (df + 0.5)
-    if not allow_negative and inner < 1:
-        inner = 1
+    if not allow_negative:
+        inner = np.maximum(inner, 1)
 
-    return math.log(inner)
+    return np.log(inner)
 
 
 def _score_idf_lucene(df, N):
@@ -192,7 +209,7 @@ def _score_idf_lucene(df, N):
     Computes the inverse document frequency component of the BM25 score using Lucene variant (accurate)
     Implementation: https://cs.uwaterloo.ca/~jimmylin/publications/Kamphuis_etal_ECIR2020_preprint.pdf
     """
-    return math.log(1 + (N - df + 0.5) / (df + 0.5))
+    return np.log(1 + (N - df + 0.5) / (df + 0.5))
 
 
 def _score_idf_atire(df, N):
@@ -200,7 +217,7 @@ def _score_idf_atire(df, N):
     Computes the inverse document frequency component of the BM25 score using ATIRE variant
     Implementation: https://cs.uwaterloo.ca/~jimmylin/publications/Kamphuis_etal_ECIR2020_preprint.pdf
     """
-    return math.log(N / df)
+    return np.log(N / df)
 
 
 def _score_idf_bm25l(df, N):
@@ -208,7 +225,7 @@ def _score_idf_bm25l(df, N):
     Computes the inverse document frequency component of the BM25 score using BM25L variant
     Implementation: https://cs.uwaterloo.ca/~jimmylin/publications/Kamphuis_etal_ECIR2020_preprint.pdf
     """
-    return math.log((N + 1) / (df + 0.5))
+    return np.log((N + 1) / (df + 0.5))
 
 
 def _score_idf_bm25plus(df, N):
@@ -216,7 +233,7 @@ def _score_idf_bm25plus(df, N):
     Computes the inverse document frequency component of the BM25 score using BM25+ variant
     Implementation: https://cs.uwaterloo.ca/~jimmylin/publications/Kamphuis_etal_ECIR2020_preprint.pdf
     """
-    return math.log((N + 1) / df)
+    return np.log((N + 1) / df)
 
 
 def _select_idf_scorer(method) -> callable:
@@ -430,3 +447,64 @@ def _np_csc_python(data, rows, cols, shape):
     sorted_indices = rows[sorter]
     
     return sorted_data, sorted_indices, indptr
+
+
+def _build_csc_index_jit_ready(flat_token_ids, doc_ptrs, n_vocab):
+    """
+    Numba-compilable construction of the CSC index directly from the corpus
+    token IDs, replacing the per-document Counter loop, the document frequency
+    counting and the COO->CSC conversion with two linear passes over the corpus.
+
+    `flat_token_ids` is the concatenation of the token IDs of all documents and
+    `doc_ptrs` marks the start of each document in it (`doc_ptrs[d]:doc_ptrs[d+1]`).
+
+    Returns the CSC `indptr` (one column per token), the `indices` (document
+    IDs, sorted within each column since documents are visited in order), the
+    term frequency of each (token, document) pair, and the document frequency
+    of each token. The caller is responsible for turning the term frequencies
+    into BM25 scores, which is a vectorized operation over the nonzero entries.
+    """
+    n_docs = len(doc_ptrs) - 1
+    tf_buffer = np.zeros(n_vocab, dtype=np.int32)
+
+    # Pass 1: document frequency of each token (number of documents in which
+    # it occurs at least once); tf_buffer tracks occurrences within a document
+    doc_freqs = np.zeros(n_vocab, dtype=np.int64)
+    for d in range(n_docs):
+        start, end = doc_ptrs[d], doc_ptrs[d + 1]
+        for j in range(start, end):
+            t = flat_token_ids[j]
+            if tf_buffer[t] == 0:
+                doc_freqs[t] += 1
+            tf_buffer[t] += 1
+        for j in range(start, end):
+            tf_buffer[flat_token_ids[j]] = 0
+
+    # The document frequencies give us the exact size of each CSC column
+    indptr = np.zeros(n_vocab + 1, dtype=np.int64)
+    for i in range(n_vocab):
+        indptr[i + 1] = indptr[i] + doc_freqs[i]
+    nnz = indptr[n_vocab]
+
+    # heads[t] is the next write position inside the column of token t
+    heads = indptr[:n_vocab].copy()
+    indices = np.empty(nnz, dtype=np.int32)
+    tf_data = np.empty(nnz, dtype=np.float32)
+
+    # Pass 2: count the term frequencies of each document, then emit one CSC
+    # entry per unique token on its first occurrence (resetting the buffer)
+    for d in range(n_docs):
+        start, end = doc_ptrs[d], doc_ptrs[d + 1]
+        for j in range(start, end):
+            tf_buffer[flat_token_ids[j]] += 1
+        for j in range(start, end):
+            t = flat_token_ids[j]
+            tf = tf_buffer[t]
+            if tf != 0:
+                pos = heads[t]
+                indices[pos] = d
+                tf_data[pos] = tf
+                heads[t] = pos + 1
+                tf_buffer[t] = 0
+
+    return indptr, indices, tf_data, doc_freqs

@@ -134,7 +134,8 @@ def topk(query_scores, k, backend="numba", sorted=True):
             "Invalid backend. Only 'numba' is supported."
         )
     elif backend == "numba":
-        uns_scores, uns_indices = _numba_sorted_top_k(query_scores, k)
+        # the final ordering is handled below, so skip the internal sort
+        uns_scores, uns_indices = _numba_sorted_top_k(query_scores, k, sorted=False)
         if sorted:
             sorted_inds = np.flip(np.argsort(uns_scores))
             query_inds = uns_indices[sorted_inds]

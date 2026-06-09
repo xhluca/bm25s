@@ -58,10 +58,24 @@ from .scoring import (
     _build_nonoccurrence_array,
     _np_csc_python,
     _np_csc_jit_ready,
+    _build_csc_index_jit_ready,
 )
 
 logger = logging.getLogger("bm25s")
 logger.setLevel(logging.DEBUG)
+
+# Numba dispatchers are cached at the module level so that repeated calls to
+# the activate_numba_* methods (or multiple BM25 instances) reuse the same
+# compiled functions instead of triggering a fresh JIT compilation each time.
+_NUMBA_DISPATCHER_CACHE = {}
+
+
+def _get_numba_dispatcher(func):
+    from numba import njit
+
+    if func.__name__ not in _NUMBA_DISPATCHER_CACHE:
+        _NUMBA_DISPATCHER_CACHE[func.__name__] = njit(func)
+    return _NUMBA_DISPATCHER_CACHE[func.__name__]
 
 
 class Results(NamedTuple):
@@ -238,7 +252,7 @@ class BM25:
                 "scipy is not installed. Please install scipy to use the scipy csc_backend."
             )
         
-        NUMBA_IS_DISABLED = os.environ.get("NUMBA_DISABLE_JIT") in [None, False]
+        NUMBA_IS_DISABLED = os.environ.get("NUMBA_DISABLE_JIT") not in [None, False]
         if auto_compile and self.backend == "numba" and not NUMBA_IS_DISABLED:
             # by default, we don't want to warm up the Numba functions
             self.compile(activate_numba=True, warmup=False)
@@ -315,7 +329,10 @@ class BM25:
         scores = np.zeros(num_docs, dtype=dtype)
         for i in range(len(query_tokens_ids)):
             start, end = indptr_starts[i], indptr_ends[i]
-            np.add.at(scores, indices[start:end], data[start:end])
+            # Each document appears at most once in a token's column, so the
+            # buffered fancy-index addition is equivalent to np.add.at here
+            # while being significantly faster (np.add.at is unbuffered).
+            scores[indices[start:end]] += data[start:end]
 
             # # The following code is slower with numpy, but faster after JIT compilation
             # for j in range(start, end):
@@ -349,6 +366,13 @@ class BM25:
         if self.csc_backend not in ["scipy", "numpy"]:
             raise ValueError(
                 f"Invalid csc_backend value: {self.csc_backend}. Choose from 'scipy', 'numpy'."
+            )
+
+        # If the Numba index builder was activated (see `activate_numba_csc`),
+        # build the CSC index directly from the token IDs in compiled code.
+        if getattr(self, "_build_csc_index", None) is not None:
+            return self._build_index_from_ids_jitted(
+                corpus_token_ids=corpus_token_ids, n_vocab=len(unique_token_ids)
             )
 
         avg_doc_len = np.array([len(doc_ids) for doc_ids in corpus_token_ids]).mean()
@@ -429,6 +453,91 @@ class BM25:
         scores = {
             "data": data,
             "indices": indices,
+            "indptr": indptr,
+            "num_docs": n_docs,
+        }
+        return scores
+
+    def _build_index_from_ids_jitted(self, corpus_token_ids, n_vocab):
+        """
+        Fast version of `build_index_from_ids` used when the Numba index builder
+        has been activated with `activate_numba_csc` (or `compile`). The token
+        counting and the CSC construction run in compiled code over a flattened
+        view of the corpus, and the BM25 scores are then computed with a single
+        vectorized call over the nonzero entries, reusing the same idf/tfc
+        scoring functions as the pure-Python path.
+        """
+        from itertools import chain
+
+        n_docs = len(corpus_token_ids)
+        doc_lens = np.fromiter(
+            (len(doc_ids) for doc_ids in corpus_token_ids), dtype=np.int64, count=n_docs
+        )
+        doc_ptrs = np.zeros(n_docs + 1, dtype=np.int64)
+        np.cumsum(doc_lens, out=doc_ptrs[1:])
+        flat_token_ids = np.fromiter(
+            chain.from_iterable(corpus_token_ids), dtype=np.int32, count=int(doc_ptrs[-1])
+        )
+
+        # The compiled kernel indexes arrays of size n_vocab without bounds
+        # checks, so validate the token IDs upfront (scipy does the same).
+        if flat_token_ids.size > 0:
+            if int(flat_token_ids.max()) >= n_vocab or int(flat_token_ids.min()) < 0:
+                raise ValueError(
+                    "The corpus contains token IDs that are outside the range of the vocabulary. "
+                    "Please make sure that the token IDs are between 0 and the vocabulary size."
+                )
+
+        avg_doc_len = doc_lens.mean()
+
+        indptr, indices, tf_data, doc_freqs = self._build_csc_index(
+            flat_token_ids, doc_ptrs, n_vocab
+        )
+
+        compute_idf_fn = _select_idf_scorer(self.idf_method)
+        calculate_tfc_fn = _select_tfc_scorer(self.method)
+
+        if self.method in self.methods_requiring_nonoccurrence:
+            self.nonoccurrence_array = _build_nonoccurrence_array(
+                doc_frequencies=doc_freqs,
+                n_docs=n_docs,
+                compute_idf_fn=compute_idf_fn,
+                calculate_tfc_fn=calculate_tfc_fn,
+                l_d=avg_doc_len,
+                l_avg=avg_doc_len,
+                k1=self.k1,
+                b=self.b,
+                delta=self.delta,
+                dtype=self.dtype,
+            )
+        else:
+            self.nonoccurrence_array = None
+
+        idf_array = _build_idf_array(
+            doc_frequencies=doc_freqs,
+            n_docs=n_docs,
+            compute_idf_fn=compute_idf_fn,
+            dtype=self.dtype,
+        )
+
+        # BM25 score of every (token, document) pair in the CSC index: the idf
+        # of the token's column times the term frequency component of the entry
+        tfc = calculate_tfc_fn(
+            tf_array=tf_data,
+            l_d=doc_lens[indices],
+            l_avg=avg_doc_len,
+            k1=self.k1,
+            b=self.b,
+            delta=self.delta,
+        )
+        data = np.repeat(idf_array, doc_freqs) * tfc
+
+        if self.nonoccurrence_array is not None:
+            data -= np.repeat(self.nonoccurrence_array, doc_freqs)
+
+        scores = {
+            "data": data.astype(self.dtype, copy=False),
+            "indices": indices.astype(self.int_dtype, copy=False),
             "indptr": indptr,
             "num_docs": n_docs,
         }
@@ -1326,7 +1435,7 @@ class BM25:
 
         from .scoring import _compute_relevance_from_scores_jit_ready
 
-        self._compute_relevance_from_scores = njit(
+        self._compute_relevance_from_scores = _get_numba_dispatcher(
             _compute_relevance_from_scores_jit_ready
         )
 
@@ -1344,8 +1453,18 @@ class BM25:
             raise ImportError(
                 "Numba is not installed. Please install Numba to use the Numba accelerator with `pip install numba`."
             )
+
+        if os.environ.get("NUMBA_DISABLE_JIT") is not None:
+            # without JIT compilation, the compiled builders would run as plain
+            # Python loops, which is slower than the default NumPy path
+            return
+
         # Assign the compiled function to the instance, replacing the static method
-        self._np_csc = njit(_np_csc_jit_ready)
+        self._np_csc = _get_numba_dispatcher(_np_csc_jit_ready)
+        # Also activate the compiled end-to-end index builder, which constructs
+        # the CSC index directly from the corpus token IDs (see
+        # `_build_index_from_ids_jitted`), skipping the per-document Python loops
+        self._build_csc_index = _get_numba_dispatcher(_build_csc_index_jit_ready)
 
     def warmup_numba_scorer(self):
         """
@@ -1358,12 +1477,14 @@ class BM25:
             # warm up the Numba scorer
             return
         
-        # Create dummy data for warmup
+        # Create dummy data for warmup: an index with 3 tokens and 3 documents
+        # (indptr has one entry per token plus one, so that looking up
+        # indptr[token_id + 1] stays within bounds for every query token)
         dummy_data = np.array([1.0, 2.0, 3.0], dtype=self.dtype)
         dummy_indices = np.array([0, 1, 2], dtype=self.int_dtype)
-        dummy_indptr = np.array([0, 3], dtype=self.int_dtype)
+        dummy_indptr = np.array([0, 1, 2, 3], dtype=self.int_dtype)
         dummy_query_tokens_ids = np.array([0, 1, 2], dtype=self.int_dtype)
-        num_docs = 1
+        num_docs = 3
 
         # Run the warmup scoring
         return self._compute_relevance_from_scores(
@@ -1394,3 +1515,9 @@ class BM25:
             cols=dummy_cols,
             shape=shape,
         )
+
+        # Also warm up the compiled end-to-end index builder, if activated
+        if getattr(self, "_build_csc_index", None) is not None:
+            dummy_flat_token_ids = np.array([0, 1, 0, 1], dtype=np.int32)
+            dummy_doc_ptrs = np.array([0, 2, 4], dtype=np.int64)
+            _ = self._build_csc_index(dummy_flat_token_ids, dummy_doc_ptrs, 2)
