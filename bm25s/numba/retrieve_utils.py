@@ -45,12 +45,15 @@ def _retrieve_internal_jitted_parallel(
 
         # When the posting lists of the query are long, most documents are
         # touched anyway and the candidate bookkeeping costs more than the
-        # full scan it avoids, so fall back to scanning the dense scores.
+        # full scan it avoids, so fall back to scanning the dense scores
+        # using a fresh zeroed accumulator (which needs no reset afterwards).
         total_postings = 0
         for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
             t = query_tokens_ids_flat[q_ptr]
             total_postings += indptr[t + 1] - indptr[t]
-        track_candidates = total_postings < num_docs // 4
+        track_candidates = total_postings < num_docs // 16
+        if not track_candidates:
+            scores = np.zeros(num_docs, dtype=dtype)
 
         n_candidates = 0
         if track_candidates:
@@ -125,7 +128,6 @@ def _retrieve_internal_jitted_parallel(
                     values[0] = v
                     inds[0] = d
                     sift_up(values, inds, 0, length)
-            scores[:] = 0
 
         if sorted:
             sorted_inds = np.flip(np.argsort(values))
