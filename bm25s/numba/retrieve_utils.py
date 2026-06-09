@@ -50,12 +50,12 @@ def _retrieve_internal_jitted_parallel(
         for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
             t = query_tokens_ids_flat[q_ptr]
             total_postings += indptr[t + 1] - indptr[t]
-        track_candidates = total_postings < num_docs // 2
+        track_candidates = total_postings < num_docs // 4
 
         n_candidates = 0
-        for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
-            t = query_tokens_ids_flat[q_ptr]
-            if track_candidates:
+        if track_candidates:
+            for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
+                t = query_tokens_ids_flat[q_ptr]
                 for j in range(indptr[t], indptr[t + 1]):
                     d = indices[j]
                     v = data[j]
@@ -66,39 +66,44 @@ def _retrieve_internal_jitted_parallel(
                             candidates[n_candidates] = d
                             n_candidates += 1
                         scores[d] += v
-            else:
+        else:
+            for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
+                t = query_tokens_ids_flat[q_ptr]
                 for j in range(indptr[t], indptr[t + 1]):
                     scores[indices[j]] += data[j]
 
         # Top-k selection with a min-heap over the candidate documents (or all
         # documents in the dense case), written directly into the output row
-        # of this query. Visited scores are reset as they are read, leaving
-        # the accumulator clean for the next query of this thread -- except
-        # when there are fewer candidates than k, where the scores are needed
-        # to pad the results with untouched (zero-score) documents first.
+        # of this query. The visited scores are reset along the way, leaving
+        # the accumulator clean for the next query of this thread.
         values = topk_scores[i]
         inds = topk_indices[i]
         length = 0
-        needs_padding = track_candidates and n_candidates < k
-        scan_size = n_candidates if track_candidates else num_docs
-        for c in range(scan_size):
-            d = candidates[c] if track_candidates else c
-            v = scores[d]
-            if v != 0 and not needs_padding:
+        if track_candidates and n_candidates >= k:
+            for c in range(n_candidates):
+                d = candidates[c]
+                v = scores[d]
                 scores[d] = 0
-            if weight_mask is not None:
-                v = v * weight_mask[d]
-            if length < k:
+                if weight_mask is not None:
+                    v = v * weight_mask[d]
+                if length < k:
+                    heap_push(values, inds, v, d, length)
+                    length += 1
+                elif v > values[0]:
+                    values[0] = v
+                    inds[0] = d
+                    sift_up(values, inds, 0, length)
+        elif track_candidates:
+            # fewer candidates than k: keep the scores intact while padding
+            # the results with untouched (zero-score) documents, which cannot
+            # already be among the candidates, then reset the touched entries
+            for c in range(n_candidates):
+                d = candidates[c]
+                v = scores[d]
+                if weight_mask is not None:
+                    v = v * weight_mask[d]
                 heap_push(values, inds, v, d, length)
                 length += 1
-            elif v > values[0]:
-                values[0] = v
-                inds[0] = d
-                sift_up(values, inds, 0, length)
-
-        if needs_padding:
-            # documents with a zero score were not touched by the query, so
-            # they cannot already be among the candidates in the heap
             d = 0
             while length < k:
                 if scores[d] == 0:
@@ -108,6 +113,19 @@ def _retrieve_internal_jitted_parallel(
                 d += 1
             for c in range(n_candidates):
                 scores[candidates[c]] = 0
+        else:
+            for d in range(num_docs):
+                v = scores[d]
+                if weight_mask is not None:
+                    v = v * weight_mask[d]
+                if length < k:
+                    heap_push(values, inds, v, d, length)
+                    length += 1
+                elif v > values[0]:
+                    values[0] = v
+                    inds[0] = d
+                    sift_up(values, inds, 0, length)
+            scores[:] = 0
 
         if sorted:
             sorted_inds = np.flip(np.argsort(values))
