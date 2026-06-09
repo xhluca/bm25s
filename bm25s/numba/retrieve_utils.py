@@ -1,5 +1,5 @@
 import os
-from numba import njit, prange, get_num_threads, get_thread_id
+from numba import njit, prange
 import numpy as np
 from typing import List, Tuple, Any
 import logging
@@ -9,6 +9,12 @@ from ..scoring import _compute_relevance_from_scores_jit_ready
 from .selection import _numba_sorted_top_k, heap_push, sift_up
 
 _compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
+
+# Documents are grouped in chunks of this size during top-k selection; the
+# maximum score of each chunk is computed first, so that entire chunks that
+# cannot contain a top-k document are skipped in the detailed pass.
+_SELECTION_CHUNK_SIZE = 512
+
 
 @njit(parallel=True)
 def _retrieve_internal_jitted_parallel(
@@ -25,109 +31,96 @@ def _retrieve_internal_jitted_parallel(
     weight_mask: np.ndarray = None,
 ):
     N = len(query_pointers) - 1
-    n_threads = get_num_threads()
+    chunk = _SELECTION_CHUNK_SIZE
+    n_chunks = (num_docs + chunk - 1) // chunk
 
     topk_scores = np.zeros((N, k), dtype=dtype)
     topk_indices = np.zeros((N, k), dtype=int_dtype)
 
-    # Each thread reuses a dense score accumulator along with the list of
-    # candidate documents touched by the current query. Tracking candidates
-    # lets us run the top-k selection over the touched documents only, and
-    # reset just those entries afterwards, instead of zeroing and scanning
-    # all `num_docs` scores for every query.
-    scores_threads = np.zeros((n_threads, num_docs), dtype=dtype)
-    candidates_threads = np.empty((n_threads, num_docs), dtype=np.int32)
-
     for i in prange(N):
-        tid = get_thread_id()
-        scores = scores_threads[tid]
-        candidates = candidates_threads[tid]
-
-        # When the posting lists of the query are long, most documents are
-        # touched anyway and the candidate bookkeeping costs more than the
-        # full scan it avoids, so fall back to scanning the dense scores
-        # using a fresh zeroed accumulator (which needs no reset afterwards).
-        total_postings = 0
+        scores = np.zeros(num_docs, dtype=dtype)
         for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
             t = query_tokens_ids_flat[q_ptr]
-            total_postings += indptr[t + 1] - indptr[t]
-        track_candidates = total_postings < num_docs // 16
-        if not track_candidates:
-            scores = np.zeros(num_docs, dtype=dtype)
+            for j in range(indptr[t], indptr[t + 1]):
+                scores[indices[j]] += data[j]
 
-        n_candidates = 0
-        if track_candidates:
-            for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
-                t = query_tokens_ids_flat[q_ptr]
-                for j in range(indptr[t], indptr[t + 1]):
-                    d = indices[j]
-                    v = data[j]
-                    # BM25 scores are nonnegative, so a document's score is
-                    # zero if and only if the query has not touched it yet
-                    if v != 0:
-                        if scores[d] == 0:
-                            candidates[n_candidates] = d
-                            n_candidates += 1
-                        scores[d] += v
-        else:
-            for q_ptr in range(query_pointers[i], query_pointers[i + 1]):
-                t = query_tokens_ids_flat[q_ptr]
-                for j in range(indptr[t], indptr[t + 1]):
-                    scores[indices[j]] += data[j]
+        # Pass 1: maximum score of every chunk of documents, with a branchless
+        # unrolled reduction that keeps four independent dependency chains
+        chunk_maxes = np.empty(n_chunks, dtype=dtype)
+        for c in range(n_chunks):
+            start = c * chunk
+            end = min(start + chunk, num_docs)
+            m0 = np.float32(0.0)
+            m1 = np.float32(0.0)
+            m2 = np.float32(0.0)
+            m3 = np.float32(0.0)
+            x = start
+            if weight_mask is None:
+                while x + 4 <= end:
+                    m0 = max(m0, scores[x])
+                    m1 = max(m1, scores[x + 1])
+                    m2 = max(m2, scores[x + 2])
+                    m3 = max(m3, scores[x + 3])
+                    x += 4
+                while x < end:
+                    m0 = max(m0, scores[x])
+                    x += 1
+            else:
+                while x < end:
+                    m0 = max(m0, scores[x] * weight_mask[x])
+                    x += 1
+            chunk_maxes[c] = max(max(m0, m1), max(m2, m3))
 
-        # Top-k selection with a min-heap over the candidate documents (or all
-        # documents in the dense case), written directly into the output row
-        # of this query. The visited scores are reset along the way, leaving
-        # the accumulator clean for the next query of this thread.
+        # Pass 2: every chunk max is the (masked) score of one real document,
+        # and the chunk maxes cover pairwise distinct documents, so the kth
+        # largest chunk max is a valid lower bound on the kth best score.
+        # Priming the selection threshold with it lets the detailed pass skip
+        # most chunks before the top-k heap would have warmed it up.
+        fill_bound = np.float32(0.0)
+        if n_chunks > k:
+            bound_values = np.empty(k, dtype=dtype)
+            bound_inds = np.empty(k, dtype=int_dtype)
+            bound_length = 0
+            for c in range(n_chunks):
+                v = chunk_maxes[c]
+                if bound_length < k:
+                    heap_push(bound_values, bound_inds, v, c, bound_length)
+                    bound_length += 1
+                elif v > bound_values[0]:
+                    bound_values[0] = v
+                    sift_up(bound_values, bound_inds, 0, bound_length)
+            fill_bound = bound_values[0]
+
+        # Pass 3: top-k selection with a min-heap over the chunks that can
+        # still contain a top-k document. At least k documents score at least
+        # fill_bound (see above), so the heap is guaranteed to fill up.
         values = topk_scores[i]
         inds = topk_indices[i]
         length = 0
-        if track_candidates and n_candidates >= k:
-            for c in range(n_candidates):
-                d = candidates[c]
-                v = scores[d]
-                scores[d] = 0
-                if weight_mask is not None:
-                    v = v * weight_mask[d]
-                if length < k:
-                    heap_push(values, inds, v, d, length)
-                    length += 1
-                elif v > values[0]:
-                    values[0] = v
-                    inds[0] = d
-                    sift_up(values, inds, 0, length)
-        elif track_candidates:
-            # fewer candidates than k: keep the scores intact while padding
-            # the results with untouched (zero-score) documents, which cannot
-            # already be among the candidates, then reset the touched entries
-            for c in range(n_candidates):
-                d = candidates[c]
-                v = scores[d]
-                if weight_mask is not None:
-                    v = v * weight_mask[d]
-                heap_push(values, inds, v, d, length)
-                length += 1
-            d = 0
-            while length < k:
-                if scores[d] == 0:
-                    values[length] = 0
-                    inds[length] = d
-                    length += 1
-                d += 1
-            for c in range(n_candidates):
-                scores[candidates[c]] = 0
-        else:
-            for d in range(num_docs):
+        tau = np.float32(-1.0)  # the heap root once the heap is full
+        for c in range(n_chunks):
+            if length >= k:
+                if chunk_maxes[c] <= tau:
+                    continue
+            elif chunk_maxes[c] < fill_bound:
+                continue
+            start = c * chunk
+            end = min(start + chunk, num_docs)
+            for d in range(start, end):
                 v = scores[d]
                 if weight_mask is not None:
                     v = v * weight_mask[d]
                 if length < k:
-                    heap_push(values, inds, v, d, length)
-                    length += 1
-                elif v > values[0]:
+                    if v >= fill_bound:
+                        heap_push(values, inds, v, d, length)
+                        length += 1
+                        if length == k:
+                            tau = values[0]
+                elif v > tau:
                     values[0] = v
                     inds[0] = d
                     sift_up(values, inds, 0, length)
+                    tau = values[0]
 
         if sorted:
             sorted_inds = np.flip(np.argsort(values))
