@@ -1482,19 +1482,28 @@ class BM25:
         # indptr[token_id + 1] stays within bounds for every query token)
         dummy_data = np.array([1.0, 2.0, 3.0], dtype=self.dtype)
         dummy_indices = np.array([0, 1, 2], dtype=self.int_dtype)
-        dummy_indptr = np.array([0, 1, 2, 3], dtype=self.int_dtype)
         dummy_query_tokens_ids = np.array([0, 1, 2], dtype=self.int_dtype)
         num_docs = 3
 
-        # Run the warmup scoring
-        return self._compute_relevance_from_scores(
-            data=dummy_data,
-            indptr=dummy_indptr,
-            indices=dummy_indices,
-            num_docs=num_docs,
-            query_tokens_ids=dummy_query_tokens_ids,
-            dtype=np.dtype(self.dtype),
-        )
+        # Run the warmup scoring. If an index has already been built, use the
+        # dtype of its indptr array so that the compiled specialization matches
+        # the one used at query time; otherwise compile for both the int_dtype
+        # and int64 variants (the Numba CSC builder produces an int64 indptr).
+        if getattr(self, "scores", None) is not None:
+            indptr_dtypes = [self.scores["indptr"].dtype]
+        else:
+            indptr_dtypes = {np.dtype(self.int_dtype), np.dtype(np.int64)}
+        result = None
+        for indptr_dtype in indptr_dtypes:
+            result = self._compute_relevance_from_scores(
+                data=dummy_data,
+                indptr=np.array([0, 1, 2, 3], dtype=indptr_dtype),
+                indices=dummy_indices,
+                num_docs=num_docs,
+                query_tokens_ids=dummy_query_tokens_ids,
+                dtype=np.dtype(self.dtype),
+            )
+        return result
     
     def warmup_numba_csc(self):
         """
