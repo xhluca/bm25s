@@ -44,40 +44,45 @@ def _retrieve_internal_jitted_parallel(
             for j in range(indptr[t], indptr[t + 1]):
                 scores[indices[j]] += data[j]
 
-        # Pass 1: maximum score of every chunk of documents, with a branchless
-        # unrolled reduction that keeps four independent dependency chains
-        chunk_maxes = np.empty(n_chunks, dtype=dtype)
-        for c in range(n_chunks):
-            start = c * chunk
-            end = min(start + chunk, num_docs)
-            m0 = np.float32(0.0)
-            m1 = np.float32(0.0)
-            m2 = np.float32(0.0)
-            m3 = np.float32(0.0)
-            x = start
-            if weight_mask is None:
-                while x + 4 <= end:
-                    m0 = max(m0, scores[x])
-                    m1 = max(m1, scores[x + 1])
-                    m2 = max(m2, scores[x + 2])
-                    m3 = max(m3, scores[x + 3])
-                    x += 4
-                while x < end:
-                    m0 = max(m0, scores[x])
-                    x += 1
-            else:
-                while x < end:
-                    m0 = max(m0, scores[x] * weight_mask[x])
-                    x += 1
-            chunk_maxes[c] = max(max(m0, m1), max(m2, m3))
+        values = topk_scores[i]
+        inds = topk_indices[i]
+        length = 0
+        tau = np.float32(-1.0)  # the heap root once the heap is full
 
-        # Pass 2: every chunk max is the (masked) score of one real document,
-        # and the chunk maxes cover pairwise distinct documents, so the kth
-        # largest chunk max is a valid lower bound on the kth best score.
-        # Priming the selection threshold with it lets the detailed pass skip
-        # most chunks before the top-k heap would have warmed it up.
-        fill_bound = np.float32(0.0)
         if n_chunks > k:
+            # Pass 1: maximum score of every chunk of documents, with a
+            # branchless unrolled reduction (four independent max chains)
+            chunk_maxes = np.empty(n_chunks, dtype=dtype)
+            for c in range(n_chunks):
+                start = c * chunk
+                end = min(start + chunk, num_docs)
+                m0 = np.float32(0.0)
+                m1 = np.float32(0.0)
+                m2 = np.float32(0.0)
+                m3 = np.float32(0.0)
+                x = start
+                if weight_mask is None:
+                    while x + 4 <= end:
+                        m0 = max(m0, scores[x])
+                        m1 = max(m1, scores[x + 1])
+                        m2 = max(m2, scores[x + 2])
+                        m3 = max(m3, scores[x + 3])
+                        x += 4
+                    while x < end:
+                        m0 = max(m0, scores[x])
+                        x += 1
+                else:
+                    while x < end:
+                        m0 = max(m0, scores[x] * weight_mask[x])
+                        x += 1
+                chunk_maxes[c] = max(max(m0, m1), max(m2, m3))
+
+            # Pass 2: every chunk max is the (masked) score of one real
+            # document, and the chunk maxes cover pairwise distinct documents,
+            # so the kth largest chunk max is a valid lower bound on the kth
+            # best score. Priming the selection threshold with it lets the
+            # detailed pass skip most chunks outright, instead of warming the
+            # threshold up from zero while scanning every document.
             bound_values = np.empty(k, dtype=dtype)
             bound_inds = np.empty(k, dtype=int_dtype)
             bound_length = 0
@@ -91,31 +96,44 @@ def _retrieve_internal_jitted_parallel(
                     sift_up(bound_values, bound_inds, 0, bound_length)
             fill_bound = bound_values[0]
 
-        # Pass 3: top-k selection with a min-heap over the chunks that can
-        # still contain a top-k document. At least k documents score at least
-        # fill_bound (see above), so the heap is guaranteed to fill up.
-        values = topk_scores[i]
-        inds = topk_indices[i]
-        length = 0
-        tau = np.float32(-1.0)  # the heap root once the heap is full
-        for c in range(n_chunks):
-            if length >= k:
-                if chunk_maxes[c] <= tau:
+            # Pass 3: top-k selection with a min-heap over the chunks that can
+            # still contain a top-k document. At least k documents score at
+            # least fill_bound (see above), so the heap is guaranteed to fill.
+            for c in range(n_chunks):
+                if length >= k:
+                    if chunk_maxes[c] <= tau:
+                        continue
+                elif chunk_maxes[c] < fill_bound:
                     continue
-            elif chunk_maxes[c] < fill_bound:
-                continue
-            start = c * chunk
-            end = min(start + chunk, num_docs)
-            for d in range(start, end):
+                start = c * chunk
+                end = min(start + chunk, num_docs)
+                for d in range(start, end):
+                    v = scores[d]
+                    if weight_mask is not None:
+                        v = v * weight_mask[d]
+                    if length < k:
+                        if v >= fill_bound:
+                            heap_push(values, inds, v, d, length)
+                            length += 1
+                            if length == k:
+                                tau = values[0]
+                    elif v > tau:
+                        values[0] = v
+                        inds[0] = d
+                        sift_up(values, inds, 0, length)
+                        tau = values[0]
+        else:
+            # k is at least the number of chunks, so the chunk-max bound is
+            # vacuous: select with a plain single pass over the scores
+            for d in range(num_docs):
                 v = scores[d]
                 if weight_mask is not None:
                     v = v * weight_mask[d]
                 if length < k:
-                    if v >= fill_bound:
-                        heap_push(values, inds, v, d, length)
-                        length += 1
-                        if length == k:
-                            tau = values[0]
+                    heap_push(values, inds, v, d, length)
+                    length += 1
+                    if length == k:
+                        tau = values[0]
                 elif v > tau:
                     values[0] = v
                     inds[0] = d
