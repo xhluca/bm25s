@@ -36,6 +36,7 @@ def _retrieve_internal_jitted_parallel(
 
     topk_scores = np.zeros((N, k), dtype=dtype)
     topk_indices = np.zeros((N, k), dtype=int_dtype)
+    n_exhaustive = 0
 
     for i in prange(N):
         scores = np.zeros(num_docs, dtype=dtype)
@@ -99,9 +100,17 @@ def _retrieve_internal_jitted_parallel(
             # Pass 3: top-k selection with a min-heap over the chunks that can
             # still contain a top-k document. At least k documents score at
             # least fill_bound (see above), so the heap is guaranteed to fill.
+            # Documents whose score ties the selection threshold are tracked:
+            # which of the tied documents survive (and how equal scores are
+            # ordered) depends on the order in which documents enter the heap,
+            # so those queries are redone below with the exhaustive scan to
+            # return exactly what it would have returned.
+            tie_possible = False
             for c in range(n_chunks):
                 if length >= k:
                     if chunk_maxes[c] <= tau:
+                        if chunk_maxes[c] == tau:
+                            tie_possible = True
                         continue
                 elif chunk_maxes[c] < fill_bound:
                     continue
@@ -118,13 +127,40 @@ def _retrieve_internal_jitted_parallel(
                             if length == k:
                                 tau = values[0]
                     elif v > tau:
+                        evicted = values[0]
                         values[0] = v
                         inds[0] = d
                         sift_up(values, inds, 0, length)
                         tau = values[0]
+                        if evicted == tau:
+                            # a document tied with the evicted one remains:
+                            # which of the two was dropped depends on the
+                            # heap layout, so fall back to the exact scan
+                            tie_possible = True
+                    elif v == tau:
+                        tie_possible = True
+
+            # equal scores anywhere inside the top-k also make the final
+            # ordering depend on the traversal, so check for duplicates
+            if not tie_possible:
+                check_order = np.argsort(values)
+                for x in range(k - 1):
+                    if values[check_order[x]] == values[check_order[x + 1]]:
+                        tie_possible = True
+                        break
+            exhaustive = tie_possible
         else:
             # k is at least the number of chunks, so the chunk-max bound is
-            # vacuous: select with a plain single pass over the scores
+            # vacuous and the exhaustive scan is used directly
+            exhaustive = True
+
+        if exhaustive:
+            # Plain single pass over all scores, identical (heap operation by
+            # heap operation) to the original kernel, so the selected
+            # documents and their tie ordering match it exactly.
+            n_exhaustive += 1
+            length = 0
+            tau = np.float32(-1.0)
             for d in range(num_docs):
                 v = scores[d]
                 if weight_mask is not None:
@@ -145,7 +181,7 @@ def _retrieve_internal_jitted_parallel(
             topk_scores[i] = values[sorted_inds]
             topk_indices[i] = inds[sorted_inds]
 
-    return topk_scores, topk_indices
+    return topk_scores, topk_indices, n_exhaustive
 
 
 @njit(parallel=True)
@@ -255,9 +291,7 @@ def _retrieve_numba_functional(
     query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(int_dtype)
 
     if nonoccurrence_array is None:
-        retrieved_scores, retrieved_indices = _retrieve_internal_jitted_parallel(
-            query_pointers=query_pointers,
-            query_tokens_ids_flat=query_tokens_ids_flat,
+        kernel_kwargs = dict(
             k=k,
             sorted=sorted,
             dtype=np.dtype(dtype),
@@ -268,6 +302,45 @@ def _retrieve_numba_functional(
             num_docs=scores["num_docs"],
             weight_mask=weight_mask,
         )
+        # The pruned selection is exact but reverts to the exhaustive scan for
+        # queries whose top-k contains tied scores; if a probe of the first
+        # queries shows that ties dominate (as is common with large k), skip
+        # the pruning attempt for the remaining queries.
+        n_queries = len(query_pointers) - 1
+        n_chunks = (scores["num_docs"] + _SELECTION_CHUNK_SIZE - 1) // _SELECTION_CHUNK_SIZE
+        n_probe = min(32, n_queries) if n_chunks > k else 0
+        if n_probe > 0:
+            retrieved_scores, retrieved_indices, n_exhaustive = _retrieve_internal_jitted_parallel(
+                query_pointers=query_pointers[: n_probe + 1],
+                query_tokens_ids_flat=query_tokens_ids_flat,
+                **kernel_kwargs,
+            )
+        else:
+            retrieved_scores = retrieved_indices = None
+            n_exhaustive = 1  # pruning cannot engage: use the exhaustive kernel
+        if n_queries > n_probe:
+            rest_pointers = query_pointers[n_probe:] - query_pointers[n_probe]
+            rest_tokens = query_tokens_ids_flat[query_pointers[n_probe]:]
+            if 2 * n_exhaustive < max(n_probe, 1):
+                rest_scores, rest_indices, _ = _retrieve_internal_jitted_parallel(
+                    query_pointers=rest_pointers,
+                    query_tokens_ids_flat=rest_tokens,
+                    **kernel_kwargs,
+                )
+            else:
+                # ties dominate, so the pruning attempts would be wasted work:
+                # run the exhaustive kernel directly (identical results)
+                rest_scores, rest_indices = _retrieve_internal_jitted_parallel_nonoccurrence(
+                    query_pointers=rest_pointers,
+                    query_tokens_ids_flat=rest_tokens,
+                    nonoccurrence_array=None,
+                    **kernel_kwargs,
+                )
+            if retrieved_scores is None:
+                retrieved_scores, retrieved_indices = rest_scores, rest_indices
+            else:
+                retrieved_scores = np.concatenate((retrieved_scores, rest_scores))
+                retrieved_indices = np.concatenate((retrieved_indices, rest_indices))
     else:
         retrieved_scores, retrieved_indices = _retrieve_internal_jitted_parallel_nonoccurrence(
             query_pointers=query_pointers,
