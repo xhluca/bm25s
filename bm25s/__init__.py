@@ -74,7 +74,9 @@ def _get_numba_dispatcher(func):
     from numba import njit
 
     if func.__name__ not in _NUMBA_DISPATCHER_CACHE:
-        _NUMBA_DISPATCHER_CACHE[func.__name__] = njit(func)
+        # cache=True persists the compiled code on disk, so new processes
+        # skip the multi-second JIT compilation on their first call
+        _NUMBA_DISPATCHER_CACHE[func.__name__] = njit(cache=True)(func)
     return _NUMBA_DISPATCHER_CACHE[func.__name__]
 
 

@@ -10,7 +10,7 @@ import numpy as np
 from numba import njit
 
 
-@njit()
+@njit(cache=True)
 def _numba_unsorted_top_k_legacy(array: np.ndarray, k: int):
     top_k_values = np.zeros(k, dtype=np.float32)
     top_k_indices = np.zeros(k, dtype=np.int32)
@@ -28,7 +28,7 @@ def _numba_unsorted_top_k_legacy(array: np.ndarray, k: int):
     return top_k_values, top_k_indices
 
 
-@njit()
+@njit(cache=True)
 def sift_down(values, indices, startpos, pos):
     new_value = values[pos]
     new_index = indices[pos]
@@ -45,7 +45,7 @@ def sift_down(values, indices, startpos, pos):
     indices[pos] = new_index
 
 
-@njit()
+@njit(cache=True)
 def sift_up(values, indices, pos, length):
     startpos = pos
     new_value = values[pos]
@@ -64,14 +64,14 @@ def sift_up(values, indices, pos, length):
     sift_down(values, indices, startpos, pos)
 
 
-@njit()
+@njit(cache=True)
 def heap_push(values, indices, value, index, length):
     values[length] = value
     indices[length] = index
     sift_down(values, indices, 0, length)
 
 
-@njit()
+@njit(cache=True)
 def heap_pop(values, indices, length):
     return_value = values[0]
     return_index = indices[0]
@@ -83,7 +83,7 @@ def heap_pop(values, indices, length):
     return return_value, return_index
 
 
-@njit()
+@njit(cache=True)
 def _numba_sorted_top_k(array: np.ndarray, k: int, sorted=True):
     n = len(array)
     if k > n:

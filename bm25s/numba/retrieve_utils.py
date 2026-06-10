@@ -8,7 +8,7 @@ from .. import utils
 from ..scoring import _compute_relevance_from_scores_jit_ready
 from .selection import _numba_sorted_top_k, heap_push, sift_up
 
-_compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
+_compute_relevance_from_scores_jit_ready = njit(cache=True)(_compute_relevance_from_scores_jit_ready)
 
 # Documents are grouped in chunks of this size during top-k selection; the
 # maximum score of each chunk is computed first, so that entire chunks that
@@ -20,7 +20,7 @@ _SELECTION_CHUNK_SIZE = 512
 _EXHAUSTIVE_KERNEL_WARMED = set()
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,
@@ -189,7 +189,7 @@ def _retrieve_internal_jitted_parallel(
     return topk_scores, topk_indices, n_exhaustive
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def _retrieve_internal_jitted_parallel_nonoccurrence(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,
