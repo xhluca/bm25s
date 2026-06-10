@@ -792,6 +792,7 @@ class BM25:
         chunksize: int = 50,
         backend_selection: str = "auto",
         weight_mask: np.ndarray = None,
+        exact_ties: bool = False,
     ):
         """
         Retrieve the top-k documents for each query (tokenized).
@@ -847,6 +848,14 @@ class BM25:
         weight_mask : np.ndarray
             A weight mask to filter the documents. If provided, the scores for the masked
             documents will be set to 0 to avoid returning them in the results.
+
+        exact_ties : bool
+            Only used by the numba backend. Documents with exactly equal scores can be
+            selected and ordered arbitrarily within the top-k. If False (default), the
+            retrieval uses a faster selection whose choice among tied documents may
+            differ from earlier versions of bm25s. If True, ties are selected and
+            ordered exactly as the original exhaustive scan would, at the cost of
+            retrieval speed on corpora with many tied scores.
 
         Returns
         -------
@@ -985,6 +994,7 @@ class BM25:
                 int_dtype=self.int_dtype,
                 nonoccurrence_array=self.nonoccurrence_array,
                 weight_mask=weight_mask,
+                exact_ties=exact_ties,
             )
 
             if return_as == "tuple":

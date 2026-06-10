@@ -32,6 +32,7 @@ def _retrieve_internal_jitted_parallel(
     indptr: np.ndarray,
     indices: np.ndarray,
     num_docs: int,
+    exact_ties: bool = False,
     weight_mask: np.ndarray = None,
 ):
     N = len(query_pointers) - 1
@@ -146,13 +147,13 @@ def _retrieve_internal_jitted_parallel(
 
             # equal scores anywhere inside the top-k also make the final
             # ordering depend on the traversal, so check for duplicates
-            if not tie_possible:
+            if exact_ties and not tie_possible:
                 check_order = np.argsort(values)
                 for x in range(k - 1):
                     if values[check_order[x]] == values[check_order[x + 1]]:
                         tie_possible = True
                         break
-            exhaustive = tie_possible
+            exhaustive = exact_ties and tie_possible
         else:
             # k is at least the number of chunks, so the chunk-max bound is
             # vacuous and the exhaustive scan is used directly
@@ -257,6 +258,7 @@ def _retrieve_numba_functional(
     dtype="float32",
     int_dtype="int32",
     weight_mask=None,
+    exact_ties=False,
 ):
     from numba import get_num_threads, set_num_threads, njit
 
@@ -338,6 +340,7 @@ def _retrieve_numba_functional(
             retrieved_scores, retrieved_indices, n_exhaustive = _retrieve_internal_jitted_parallel(
                 query_pointers=query_pointers[: n_probe + 1],
                 query_tokens_ids_flat=query_tokens_ids_flat,
+                exact_ties=exact_ties,
                 **kernel_kwargs,
             )
         else:
@@ -350,6 +353,7 @@ def _retrieve_numba_functional(
                 rest_scores, rest_indices, _ = _retrieve_internal_jitted_parallel(
                     query_pointers=rest_pointers,
                     query_tokens_ids_flat=rest_tokens,
+                    exact_ties=exact_ties,
                     **kernel_kwargs,
                 )
             else:
