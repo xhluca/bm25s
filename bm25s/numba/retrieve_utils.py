@@ -15,6 +15,10 @@ _compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores
 # cannot contain a top-k document are skipped in the detailed pass.
 _SELECTION_CHUNK_SIZE = 512
 
+# Type signatures for which the exhaustive selection kernel has already been
+# compiled (see _retrieve_numba_functional)
+_EXHAUSTIVE_KERNEL_WARMED = set()
+
 
 @njit(parallel=True)
 def _retrieve_internal_jitted_parallel(
@@ -302,6 +306,27 @@ def _retrieve_numba_functional(
             num_docs=scores["num_docs"],
             weight_mask=weight_mask,
         )
+        # Both kernels below may be used depending on the tie rate, so make
+        # sure both are compiled on the first call (e.g. a warmup): otherwise
+        # the exhaustive kernel would be JIT-compiled in the middle of the
+        # first large retrieval. The warmup runs a single query and is keyed
+        # on the argument types that determine the compiled specialization.
+        warm_key = (
+            str(np.dtype(dtype)),
+            str(np.dtype(int_dtype)),
+            str(scores["indptr"].dtype),
+            str(scores["indices"].dtype),
+            bool(sorted),
+            weight_mask is None,
+        )
+        if warm_key not in _EXHAUSTIVE_KERNEL_WARMED and len(query_pointers) > 1:
+            _EXHAUSTIVE_KERNEL_WARMED.add(warm_key)
+            _retrieve_internal_jitted_parallel_nonoccurrence(
+                query_pointers=query_pointers[:2],
+                query_tokens_ids_flat=query_tokens_ids_flat,
+                nonoccurrence_array=None,
+                **kernel_kwargs,
+            )
         # The pruned selection is exact but reverts to the exhaustive scan for
         # queries whose top-k contains tied scores; if a probe of the first
         # queries shows that ties dominate (as is common with large k), skip
