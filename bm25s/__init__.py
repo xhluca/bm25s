@@ -170,6 +170,7 @@ class BM25:
         backend="numpy",
         csc_backend="numpy",
         auto_compile=True,
+        quantize=False,
     ):
         """
         BM25S initialization.
@@ -223,12 +224,22 @@ class BM25:
         auto_compile : bool
             If True, it will automatically compile the JIT functions when using the numba backend.
             This may take some time during the first run, but will speed up subsequent runs.
+
+        quantize : bool
+            Only used by the numba backend. If True, retrieval scores postings with
+            8-bit quantized impacts instead of float32, which substantially speeds up
+            retrieval on large corpora. Returned scores are approximate (each
+            document score is off by at most ~half a quantization step per query
+            term), which can slightly reorder documents with near-identical scores;
+            ranking quality is typically unaffected. Not supported together with
+            `weight_mask`, `exact_ties`, or the 'bm25l'/'bm25+' methods.
         """
         self.k1 = k1
         self.b = b
         self.delta = delta
         self.dtype = dtype
         self.int_dtype = int_dtype
+        self.quantize = quantize
         self.method = method
         self.idf_method = idf_method if idf_method is not None else method
         self.methods_requiring_nonoccurrence = ("bm25l", "bm25+")
@@ -795,6 +806,7 @@ class BM25:
         backend_selection: str = "auto",
         weight_mask: np.ndarray = None,
         exact_ties: bool = False,
+        quantize: bool = None,
     ):
         """
         Retrieve the top-k documents for each query (tokenized).
@@ -859,6 +871,11 @@ class BM25:
             ordered exactly as the original exhaustive scan would, at the cost of
             retrieval speed on corpora with many tied scores.
 
+        quantize : bool
+            Only used by the numba backend. If True, retrieval scores postings with
+            8-bit quantized impacts (see the `BM25` constructor parameter of the same
+            name). If None (default), the value passed to the constructor is used.
+
         Returns
         -------
         Results or np.ndarray
@@ -873,6 +890,11 @@ class BM25:
         ImportError
             If the numba backend is selected but numba is not installed.
         """
+        if quantize is None:
+            quantize = getattr(self, "quantize", False)
+        if quantize and self.backend != "numba":
+            raise ValueError("quantize=True is only supported with backend='numba'.")
+
         num_docs = self.scores["num_docs"]
         if k > num_docs:
             raise ValueError(
@@ -997,6 +1019,7 @@ class BM25:
                 nonoccurrence_array=self.nonoccurrence_array,
                 weight_mask=weight_mask,
                 exact_ties=exact_ties,
+                quantize=quantize,
             )
 
             if return_as == "tuple":
