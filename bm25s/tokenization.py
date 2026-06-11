@@ -298,31 +298,49 @@ class Tokenizer:
         stopwords_set = set(self.stopwords) if self.stopwords is not None else None
         using_stopwords = stopwords_set is not None
         using_stemmer = self.stemmer is not None
-            
+
         if allow_empty is True and update_vocab is True and "" not in self.word_to_id:
             idx = max(self.word_to_id.values(), default=-1) + 1
             self.word_to_id[""] = idx
-            
+
             if using_stemmer:
                 if "" not in self.word_to_stem:
                     self.word_to_stem[""] = ""
                 if "" not in self.stem_to_sid:
                     self.stem_to_sid[""] = idx
-        
+
+        # locals for the hot loop: attribute loads are paid once per call
+        # instead of once per word
+        word_to_id = self.word_to_id
+        word_to_stem = self.word_to_stem
+        stem_to_sid = self.stem_to_sid
+        stemmer = self.stemmer
+        splitter = self.splitter
+        lower = self.lower
+        word_to_id_get = word_to_id.get
+        word_to_stem_get = word_to_stem.get
+        may_use_sid = update_vocab != "never"
+        update_vocab_true = update_vocab is True
+
         for text in texts:
-            if self.lower:
+            if lower:
                 text = text.lower()
 
-            splitted_words = list(self.splitter(text))
+            splitted_words = splitter(text)
+            if type(splitted_words) is not list:
+                splitted_words = list(splitted_words)
 
             if allow_empty is True and len(splitted_words) == 0:
                 splitted_words = [""]
-            
+
             doc_ids = []
+            append = doc_ids.append
             for word in splitted_words:
-                if word in self.word_to_id:
-                    wid = self.word_to_id[word]
-                    doc_ids.append(wid)
+                # IDs are ints, so None is a safe "missing" sentinel and a
+                # single probe replaces the `in` + `[]` double lookup
+                wid = word_to_id_get(word)
+                if wid is not None:
+                    append(wid)
                     continue
 
                 if using_stopwords and word in stopwords_set:
@@ -332,36 +350,35 @@ class Tokenizer:
                 # words that we have never seen before can be stemmed, with the
                 # possibility that the stemmed ID is already in the stem_to_sid
                 if using_stemmer:
-                    if word in self.word_to_stem:
-                        stem = self.word_to_stem[word]
-                    else:
-                        stem = self.stemmer(word)
-                        self.word_to_stem[word] = stem
+                    stem = word_to_stem_get(word)
+                    if stem is None:
+                        stem = stemmer(word)
+                        word_to_stem[word] = stem
 
                     # if the stem is already in the stem_to_sid, we can just use the ID
                     # and update the word_to_id dictionary, unless update_vocab is "never"
                     # in which case we skip this word
-                    if update_vocab != "never" and stem in self.stem_to_sid:
-                        sid = self.stem_to_sid[stem]
-                        self.word_to_id[word] = sid
-                        doc_ids.append(sid)
+                    if may_use_sid and stem in stem_to_sid:
+                        sid = stem_to_sid[stem]
+                        word_to_id[word] = sid
+                        append(sid)
 
-                    elif update_vocab is True:
-                        sid = len(self.stem_to_sid)
-                        self.stem_to_sid[stem] = sid
-                        self.word_to_id[word] = sid
-                        doc_ids.append(sid)
+                    elif update_vocab_true:
+                        sid = len(stem_to_sid)
+                        stem_to_sid[stem] = sid
+                        word_to_id[word] = sid
+                        append(sid)
                 else:
                     # if we are not using a stemmer, we can just update the word_to_id
                     # directly rather than going through the stem_to_sid dictionary
-                    if update_vocab is True and word not in self.word_to_id:
-                        wid = len(self.word_to_id)
-                        self.word_to_id[word] = wid
-                        doc_ids.append(wid)
+                    if update_vocab_true:
+                        wid = len(word_to_id)
+                        word_to_id[word] = wid
+                        append(wid)
 
-            if len(doc_ids) == 0 and allow_empty is True and "" in self.word_to_id:
-                doc_ids = [self.word_to_id[""]]
-            
+            if len(doc_ids) == 0 and allow_empty is True and "" in word_to_id:
+                doc_ids = [word_to_id[""]]
+
             yield doc_ids
 
     def tokenize(
@@ -642,10 +659,14 @@ def tokenize(
     corpus_ids = []
     token_to_index = {}
 
+    # the stopword set and dict method are hoisted out of the loop: building
+    # them per document is pure per-document overhead
+    stopwords_set = set(stopwords)
+    token_to_index_get = token_to_index.get
+
     for text in tqdm(
         texts, desc="Split strings", leave=leave, disable=not show_progress
-    ):  
-        stopwords_set = set(stopwords)
+    ):
         if lower:
             text = text.lower()
 
@@ -653,18 +674,22 @@ def tokenize(
 
         if allow_empty is False and len(splitted) == 0:
             splitted = [""]
-        
+
         doc_ids = []
+        append = doc_ids.append
 
         for token in splitted:
+            token_id = token_to_index_get(token)
+            if token_id is not None:
+                append(token_id)
+                continue
+
             if token in stopwords_set:
                 continue
 
-            if token not in token_to_index:
-                token_to_index[token] = len(token_to_index)
-
-            token_id = token_to_index[token]
-            doc_ids.append(token_id)
+            token_id = len(token_to_index)
+            token_to_index[token] = token_id
+            append(token_id)
 
         corpus_ids.append(doc_ids)
 
@@ -693,10 +718,11 @@ def tokenize(
         }
 
         # Now, we simply need to replace the tokens in the corpus with the stemmed tokens
+        remap = doc_id_to_stem_id.__getitem__
         for i, doc_ids in enumerate(
             tqdm(corpus_ids, desc="Stem Tokens", leave=leave, disable=not show_progress)
         ):
-            corpus_ids[i] = [doc_id_to_stem_id[doc_id] for doc_id in doc_ids]
+            corpus_ids[i] = list(map(remap, doc_ids))
     else:
         vocab_dict = token_to_index
 
