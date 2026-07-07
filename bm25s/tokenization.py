@@ -36,6 +36,74 @@ from .stopwords import (
 )
 
 
+# Shared state handed to forked tokenization workers (see
+# Tokenizer._streaming_tokenize_parallel). Set in the parent right before the
+# pool is created, so the workers inherit it copy-on-write and no picklable
+# stemmer/splitter is required.
+_PARALLEL_WORKER_STATE = {}
+
+
+def _parallel_tokenize_chunk(bounds):
+    """Tokenize texts[start:end] against a *local* vocabulary, returning
+    compact arrays that the parent merges back in document order. Mirrors
+    Tokenizer.streaming_tokenize for the update_vocab=True path."""
+    import numpy as np
+
+    start, end = bounds
+    st = _PARALLEL_WORKER_STATE
+    texts = st["texts"]
+    splitter = st["splitter"]
+    lower = st["lower"]
+    stemmer = st["stemmer"]
+    using_stemmer = stemmer is not None
+    stopwords_set = st["stopwords_set"]
+    using_stopwords = stopwords_set is not None
+    allow_empty = st["allow_empty"]
+
+    resolve = {}          # word -> local token id, or None for skipped words
+    local_tokens = []     # unique tokens (stems or words), first-occurrence order
+    token_to_local = {}
+    word_to_stem = {} if using_stemmer else None
+
+    flat = []
+    offsets = np.empty(end - start + 1, dtype=np.int64)
+    offsets[0] = 0
+    for di in range(start, end):
+        text = texts[di]
+        if lower:
+            text = text.lower()
+        words = splitter(text)
+        if type(words) is not list:
+            words = list(words)
+        if allow_empty and len(words) == 0:
+            words = [""]
+
+        for w in words:
+            li = resolve.get(w, -2)  # -2 = not seen this chunk
+            if li == -2:
+                if using_stopwords and w in stopwords_set:
+                    resolve[w] = None
+                    continue
+                if using_stemmer:
+                    s = stemmer(w)
+                    word_to_stem[w] = s
+                else:
+                    s = w
+                li = token_to_local.get(s)
+                if li is None:
+                    li = len(local_tokens)
+                    local_tokens.append(s)
+                    token_to_local[s] = li
+                resolve[w] = li
+            elif li is None:
+                continue
+            flat.append(li)
+        offsets[di - start + 1] = len(flat)
+
+    flat_arr = np.array(flat, dtype=np.int32)
+    return local_tokens, flat_arr, offsets.astype(np.int64), word_to_stem
+
+
 class Tokenized(NamedTuple):
     """
     NamedTuple with two fields: ids and vocab. The ids field is a list of list of token IDs
@@ -381,6 +449,99 @@ class Tokenizer:
 
             yield doc_ids
 
+    def _can_tokenize_parallel(self, texts, update_vocab, return_as):
+        """Whether the fork-based parallel path applies. It is restricted to
+        the common corpus-tokenization case (fresh vocabulary, update_vocab
+        True, indexable input) so that its output is identical to the serial
+        tokenizer."""
+        import multiprocessing as mp
+
+        if update_vocab is not True:
+            return False
+        if return_as not in ("ids", "tuple", "string"):
+            return False
+        if not isinstance(texts, (list, tuple)):
+            return False
+        if len(self.word_to_id) != 0 or len(self.stem_to_sid) != 0:
+            return False  # only a fresh vocabulary is supported
+        if "fork" not in mp.get_all_start_methods():
+            return False
+        return True
+
+    def _tokenize_parallel(self, texts, n_jobs, allow_empty):
+        """Tokenize `texts` across `n_jobs` forked workers, producing token IDs
+        and vocabulary dictionaries identical to the serial tokenizer. Each
+        worker tokenizes a contiguous slice against a local vocabulary; merging
+        the slices in document order reproduces the exact first-occurrence ID
+        assignment of the serial path."""
+        import multiprocessing as mp
+        import numpy as np
+
+        n = len(texts)
+        if n_jobs < 0:
+            n_jobs = os.cpu_count() or 1
+        n_jobs = max(1, min(n_jobs, n))
+        bounds = np.linspace(0, n, n_jobs + 1).astype(int)
+        ranges = [(int(bounds[i]), int(bounds[i + 1])) for i in range(n_jobs)]
+
+        using_stemmer = self.stemmer is not None
+        _PARALLEL_WORKER_STATE.clear()
+        _PARALLEL_WORKER_STATE.update(
+            texts=texts,
+            splitter=self.splitter,
+            lower=self.lower,
+            stemmer=self.stemmer,
+            stopwords_set=set(self.stopwords) if self.stopwords is not None else None,
+            allow_empty=allow_empty,
+        )
+        try:
+            ctx = mp.get_context("fork")
+            with ctx.Pool(n_jobs) as pool:
+                results = pool.map(_parallel_tokenize_chunk, ranges)
+        finally:
+            _PARALLEL_WORKER_STATE.clear()
+
+        # Seed the empty token exactly as the serial path does: it is inserted
+        # first (ID 0) when allow_empty and the vocabulary is fresh.
+        token_to_gid = {}
+        if allow_empty:
+            token_to_gid[""] = 0
+        empty_id = token_to_gid.get("", None)
+
+        corpus_ids = [None] * n
+        word_to_stem = {"": ""} if (using_stemmer and allow_empty) else {}
+        di = 0
+        for local_tokens, flat_arr, offsets, ws in results:
+            l2g = np.empty(len(local_tokens), dtype=np.int64)
+            for li, tok in enumerate(local_tokens):
+                g = token_to_gid.get(tok)
+                if g is None:
+                    g = len(token_to_gid)
+                    token_to_gid[tok] = g
+                l2g[li] = g
+            gids = l2g[flat_arr].tolist() if len(flat_arr) else []
+            offs = offsets.tolist()
+            for j in range(len(offs) - 1):
+                a = offs[j]; b = offs[j + 1]
+                if b > a:
+                    corpus_ids[di] = gids[a:b]
+                elif allow_empty:
+                    corpus_ids[di] = [empty_id]
+                else:
+                    corpus_ids[di] = []
+                di += 1
+            if using_stemmer:
+                word_to_stem.update(ws)
+
+        if using_stemmer:
+            self.stem_to_sid = token_to_gid
+            self.word_to_stem = word_to_stem
+            self.word_to_id = {w: token_to_gid[s] for w, s in word_to_stem.items()}
+        else:
+            self.word_to_id = token_to_gid
+
+        return corpus_ids
+
     def tokenize(
         self,
         texts: List[str],
@@ -390,6 +551,7 @@ class Tokenizer:
         length: Union[int, None] = None,
         return_as: str = "ids",
         allow_empty: bool = True,
+        n_jobs: int = 1,
     ) -> Union[List[List[int]], List[List[str]], typing.Generator, Tokenized]:
         """
         Tokenize a list of strings and return the token IDs.
@@ -432,9 +594,19 @@ class Tokenizer:
             or stemmed IDs if a stemmer is used.
         
         allow_empty : bool, optional
-            Whether to allow the splitter to return an empty string. If False, the splitter 
+            Whether to allow the splitter to return an empty string. If False, the splitter
             will return an empty list, which may cause issues if the tokenizer is not expecting
             an empty list. If True, the splitter will return a list with a single empty string.
+
+        n_jobs : int, optional
+            Number of processes to tokenize with. If 1 (default), tokenization runs
+            serially. If >1 (or -1 for all CPUs), the corpus is tokenized in parallel
+            across forked worker processes, which substantially speeds up tokenization
+            of large corpora. The parallel path produces token IDs and a vocabulary
+            identical to the serial path, and is used only when it can do so: a fresh
+            vocabulary with `update_vocab=True`, an indexable `texts` (list/tuple),
+            `return_as` in {"ids", "tuple", "string"}, and a platform that supports the
+            fork start method. It falls back to serial tokenization otherwise.
 
         Returns
         -------
@@ -458,6 +630,15 @@ class Tokenizer:
 
         if update_vocab == "if_empty":
             update_vocab = len(self.word_to_id) == 0
+
+        if n_jobs != 1 and self._can_tokenize_parallel(texts, update_vocab, return_as):
+            token_ids = self._tokenize_parallel(texts, n_jobs, allow_empty)
+            if return_as == "ids":
+                return token_ids
+            elif return_as == "string":
+                return self.decode(token_ids)
+            elif return_as == "tuple":
+                return self.to_tokenized_tuple(token_ids)
 
         stream_fn = self.streaming_tokenize(texts=texts, update_vocab=update_vocab, allow_empty=allow_empty)
 
