@@ -48,7 +48,7 @@ def postprocess_results_for_eval(results, scores, query_ids):
     return result_dict_for_eval
 
 
-def merge_cqa_dupstack(data_path):
+def merge_cqa_dupstack(data_path, show_progress=True, leave_progress=False):
     data_path = Path(data_path)
     dataset = data_path.name
     assert dataset == "cqadupstack", "Dataset must be CQADupStack"
@@ -60,13 +60,13 @@ def merge_cqa_dupstack(data_path):
         # corpus files are located under cqadupstack/<name>/corpus.jsonl
         corpus_files = list(data_path.glob("*/corpus.jsonl"))
         with open(corpus_path, "w") as f:
-            for file in tqdm(corpus_files, desc="Merging Corpus", leave=False):
+            for file in tqdm(corpus_files, desc="Merging Corpus", leave=leave_progress, disable=not show_progress):
                 # get the name of the corpus
                 corpus_name = file.parent.name
 
                 with open(file, "r") as f2:
                     for line in tqdm(
-                        f2, desc=f"Merging {corpus_name} Corpus", leave=False
+                        f2, desc=f"Merging {corpus_name} Corpus", leave=leave_progress, disable=not show_progress
                     ):
                         line = json_functions.loads(line)
                         # add the corpus name to _id
@@ -80,13 +80,13 @@ def merge_cqa_dupstack(data_path):
     if not queries_path.exists():
         queries_files = list(data_path.glob("*/queries.jsonl"))
         with open(queries_path, "w") as f:
-            for file in tqdm(queries_files, desc="Merging Queries", leave=False):
+            for file in tqdm(queries_files, desc="Merging Queries", leave=leave_progress, disable=not show_progress):
                 # get the name of the corpus
                 corpus_name = file.parent.name
 
                 with open(file, "r") as f2:
                     for line in tqdm(
-                        f2, desc=f"Merging {corpus_name} Queries", leave=False
+                        f2, desc=f"Merging {corpus_name} Queries", leave=leave_progress, disable=not show_progress
                     ):
                         line = json_functions.loads(line)
                         # add the corpus name to _id
@@ -104,7 +104,7 @@ def merge_cqa_dupstack(data_path):
         with open(qrels_path, "w") as f:
             # First, write the columns: query-id	corpus-id	score
             f.write("query-id\tcorpus-id\tscore\n")
-            for file in tqdm(qrels_files, desc="Merging Qrels", leave=False):
+            for file in tqdm(qrels_files, desc="Merging Qrels", leave=leave_progress, disable=not show_progress):
                 # get the name of the corpus
                 corpus_name = file.parent.parent.name
                 with open(file, "r") as f2:
@@ -112,7 +112,7 @@ def merge_cqa_dupstack(data_path):
                     next(f2)
 
                     for line in tqdm(
-                        f2, desc=f"Merging {corpus_name} Qrels", leave=False
+                        f2, desc=f"Merging {corpus_name} Qrels", leave=leave_progress, disable=not show_progress
                     ):
                         # since it's a tsv, split by tab
                         qid, cid, score = line.strip().split("\t")
@@ -130,6 +130,7 @@ def download_dataset(
     unzip=True,
     redownload=False,
     show_progress=True,
+    leave_progress=False,
 ):
     import urllib.request
     import urllib.error
@@ -150,7 +151,7 @@ def download_dataset(
             unit="B",
             unit_scale=True,
             desc=desc,
-            leave=False,
+            leave=leave_progress,
             disable=not show_progress,
         )
         with open(dst_path, "wb") as f:
@@ -193,7 +194,7 @@ def download_dataset(
             for part_path in tqdm(
                 part_paths,
                 desc=f"Assembling {dataset}",
-                leave=False,
+                leave=leave_progress,
                 disable=not show_progress,
             ):
                 with open(part_path, "rb") as f_in:
@@ -220,7 +221,7 @@ def download_dataset(
 
         # if it's CQADupStack, merge the corpus, queries, and qrels
         if dataset == "cqadupstack":
-            merge_cqa_dupstack(save_dir / dataset)
+            merge_cqa_dupstack(save_dir / dataset, show_progress=show_progress, leave_progress=leave_progress)
 
         return save_dir / dataset
     else:
@@ -232,6 +233,7 @@ def load_jsonl(
     fname,
     save_dir="./datasets",
     show_progress=True,
+    leave_progress=False,
     return_dict=True,
     force_title=False,
     remove=None,
@@ -249,7 +251,7 @@ def load_jsonl(
         pbar = tqdm(
             f,
             desc="[{}] loading {}".format(dataset, fname),
-            leave=False,
+            leave=leave_progress,
             disable=not show_progress,
             total=num_lines,
         )
@@ -269,11 +271,12 @@ def load_jsonl(
     return corpus
 
 
-def load_corpus(dataset, save_dir="./datasets", show_progress=True, return_dict=True):
+def load_corpus(dataset, save_dir="./datasets", show_progress=True, leave_progress=False, return_dict=True):
     return load_jsonl(
         dataset=dataset,
         save_dir=save_dir,
         show_progress=show_progress,
+        leave_progress=leave_progress,
         return_dict=return_dict,
         fname="corpus.jsonl",
         force_title=True,
@@ -281,11 +284,12 @@ def load_corpus(dataset, save_dir="./datasets", show_progress=True, return_dict=
     )
 
 
-def load_queries(dataset, save_dir="./datasets", show_progress=True, return_dict=True):
+def load_queries(dataset, save_dir="./datasets", show_progress=True, leave_progress=False, return_dict=True):
     return load_jsonl(
         dataset=dataset,
         save_dir=save_dir,
         show_progress=show_progress,
+        leave_progress=leave_progress,
         return_dict=return_dict,
         fname="queries.jsonl",
         force_title=False,
@@ -294,7 +298,7 @@ def load_queries(dataset, save_dir="./datasets", show_progress=True, return_dict
 
 
 def load_qrels(
-    dataset, split="test", save_dir="./datasets", show_progress=True, return_dict=True
+    dataset, split="test", save_dir="./datasets", show_progress=True, leave_progress=False, return_dict=True
 ):
     """
     This is tsv files
@@ -315,7 +319,7 @@ def load_qrels(
         for line in tqdm(
             f,
             desc="Loading Qrels {}".format(dataset),
-            leave=False,
+            leave=leave_progress,
             disable=not show_progress,
         ):
             qid, cid, score = line.strip().split("\t")

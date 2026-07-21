@@ -184,7 +184,7 @@ To cite `bm25s`, please use the following bibtex:
 """
 
 
-def batch_tokenize(tokenizer, texts, add_special_tokens=False):
+def batch_tokenize(tokenizer, texts, add_special_tokens=False, show_progress=True, leave_progress=False):
     tokenizer_kwargs = dict(
         return_attention_mask=False,
         return_token_type_ids=False,
@@ -195,7 +195,7 @@ def batch_tokenize(tokenizer, texts, add_special_tokens=False):
     output = []
 
     for i in tqdm(
-        range(len(texts)), desc="Processing tokens (huggingface tokenizer)", leave=False
+        range(len(texts)), desc="Processing tokens (huggingface tokenizer)", leave=leave_progress, disable=not show_progress
     ):
         output.append(tokenized[i].tokens)
 
@@ -485,6 +485,8 @@ class BM25HF(BM25):
         overwrite_local: bool = False,
         include_readme: bool = True,
         allow_pickle: bool = False,
+        show_progress: bool = True,
+        leave_progress: bool = False,
         **kwargs,
     ):
         """
@@ -527,6 +529,12 @@ class BM25HF(BM25):
         allow_pickle: bool
             Whether to allow pickling the model. Default is False.
 
+        show_progress: bool
+            Whether to show a progress bar. Default is True.
+
+        leave_progress: bool
+            Whether to leave the progress bar after completion. Default is False.
+
         kwargs: dict
             Additional keyword arguments to pass to `HfApi.upload_folder` call.
         """
@@ -550,7 +558,7 @@ class BM25HF(BM25):
             # save to a temporary directory otherwise
             save_dir = tempfile.mkdtemp()
 
-        self.save(save_dir, corpus=corpus, allow_pickle=allow_pickle)
+        self.save(save_dir, corpus=corpus, allow_pickle=allow_pickle, show_progress=show_progress, leave_progress=leave_progress)
         # if we include the README, write it to the directory
         if include_readme:
             num_docs = self.scores["num_docs"]
@@ -599,6 +607,8 @@ class BM25HF(BM25):
         load_corpus=False,
         mmap=False,
         allow_pickle=False,
+        show_progress=True,
+        leave_progress=False,
     ):
         """
         This function loads the BM25 model from the Hugging Face Hub.
@@ -627,6 +637,12 @@ class BM25HF(BM25):
 
         allow_pickle: bool
             Whether to allow pickling the model. Default is False.
+
+        show_progress: bool
+            Whether to show a progress bar. Default is True.
+
+        leave_progress: bool
+            Whether to leave the progress bar after completion. Default is False.
         """
         api = HfApi(token=token)
         # check if the model exists
@@ -645,4 +661,6 @@ class BM25HF(BM25):
             load_corpus=load_corpus,
             mmap=mmap,
             allow_pickle=allow_pickle,
+            show_progress=show_progress,
+            leave_progress=leave_progress,
         )
