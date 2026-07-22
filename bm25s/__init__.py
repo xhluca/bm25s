@@ -343,6 +343,9 @@ class BM25:
         corpus_token_ids : List[List[int]]
             List of list of token IDs for each document.
 
+        show_progress : bool
+            If True, a progress bar will be shown. If False, no progress bar will be shown.
+
         leave_progress : bool
             If True, the progress bars will remain after the function completes.
         """
@@ -947,7 +950,8 @@ class BM25:
         nnoc_name="nonoccurrence_array.index.npy",
         corpus_name="corpus.jsonl",
         allow_pickle=False,
-        show_progress=True
+        show_progress=True,
+        leave_progress=False
     ):
         """
         Save the BM25S index to the `save_dir` directory. This will save the scores array,
@@ -990,6 +994,9 @@ class BM25:
 
         show_progress : bool
             If True, a progress bar will be shown. If False, no progress bar will be shown.
+
+        leave_progress : bool
+            If True, the progress bar will remain after the function completes.
         """
         # Save the self.vocab_dict and self.score_matrix to the save_dir
         save_dir = Path(save_dir)
@@ -1061,7 +1068,7 @@ class BM25:
                         f.write(doc_str + "\n")
 
             # also save corpus.mmindex
-            mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name, show_progress=show_progress)
+            mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name, show_progress=show_progress, leave_progress=leave_progress)
             utils.corpus.save_mmindex(mmidx, path=save_dir / corpus_name)
 
     def load_scores(
@@ -1135,6 +1142,8 @@ class BM25:
         allow_pickle=False,
         load_vocab=True,
         override_params: dict = None,
+        show_progress=True,
+        leave_progress=False,
         **kwargs,
     ):
         """
@@ -1189,6 +1198,12 @@ class BM25:
             the parameters of the BM25 object after loading it. For example, you can change auto_compile from
             False to True after loading the object.
         
+        show_progress : bool
+            If True, a progress bar will be shown. If False, no progress bar will be shown.
+
+        leave_progress : bool
+            If True, the progress bar will remain after the function completes.
+
         **kwargs
             Additional arguments are treated as overrides for the parameters.
         """
@@ -1241,7 +1256,7 @@ class BM25:
             corpus_file = save_dir / corpus_name
             if os.path.exists(corpus_file):
                 if mmap is True:
-                    corpus = utils.corpus.JsonlCorpus(corpus_file)
+                    corpus = utils.corpus.JsonlCorpus(corpus_file, show_progress=show_progress, leave_progress=leave_progress)
                 else:
                     corpus = []
                     with open(corpus_file, "r", encoding="utf-8") as f:
