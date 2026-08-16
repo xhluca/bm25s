@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "bm25s"
+abstract: "An ultra-fast implementation of BM25 based on sparse matrices."
+authors:
+  - family-names: "Lù"
+    given-names: "Xing Han"
+version: "0.3.10"
+date-released: "2026-07-22"
+license: MIT
+repository-code: "https://github.com/xhluca/bm25s"
+url: "https://bm25s.github.io"
+keywords:
+  - bm25
+  - information-retrieval
+  - lexical-search
+  - sparse-retrieval
+preferred-citation:
+  type: article
+  title: "BM25S: Orders of magnitude faster lexical search via eager sparse scoring"
+  authors:
+    - family-names: "Lù"
+      given-names: "Xing Han"
+  year: 2024
+  journal: "arXiv preprint arXiv:2407.03618"
+  url: "https://arxiv.org/abs/2407.03618"
+  identifiers:
+    - type: other
+      value: "arXiv:2407.03618"
+      description: "The arXiv preprint of the paper"
