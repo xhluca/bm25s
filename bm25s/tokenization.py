@@ -19,6 +19,7 @@ except ImportError:
 
 
 from .stopwords import (
+    STOPWORDS_DANISH,
     STOPWORDS_EN,
     STOPWORDS_EN_PLUS,
     STOPWORDS_GERMAN,
@@ -552,11 +553,13 @@ def _infer_stopwords(stopwords: Union[str, List[str]]) -> Union[List[str], tuple
         return STOPWORDS_TURKISH
     elif stopwords in ["korean", "ko"]:
         return STOPWORDS_KOREAN
+    elif stopwords in ["danish", "da"]:
+        return STOPWORDS_DANISH
     elif stopwords in [None, False]:
         return []
     elif isinstance(stopwords, str):
         raise ValueError(
-            f"{stopwords} not recognized. Only English stopwords as default, German, Dutch, French, Spanish, Portuguese, Italian, Russian, Swedish, Norwegian, Chinese, Turkish, and Korean are currently supported. "
+            f"{stopwords} not recognized. Only English stopwords as default, German, Dutch, French, Spanish, Portuguese, Italian, Russian, Swedish, Norwegian, Chinese, Turkish, Korean, and Danish are currently supported. "
             "Please input a list of stopwords"
         )
     else:
