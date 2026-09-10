@@ -1,5 +1,5 @@
 import os
-from .. import nogil
+from .. import VAR_NOGIL
 from numba import njit, prange
 import numpy as np
 from typing import List, Tuple, Any
@@ -9,9 +9,9 @@ from .. import utils
 from ..scoring import _compute_relevance_from_scores_jit_ready
 from .selection import _numba_sorted_top_k
 
-_compute_relevance_from_scores_jit_ready = njit(nogil=nogil)(_compute_relevance_from_scores_jit_ready)
+_compute_relevance_from_scores_jit_ready = njit(nogil=VAR_NOGIL)(_compute_relevance_from_scores_jit_ready)
 
-@njit(parallel=True, nogil=nogil)
+@njit(parallel=True, nogil=VAR_NOGIL)
 def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,

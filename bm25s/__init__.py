@@ -12,7 +12,7 @@ import numpy as np
 
 from .utils import json_functions as json_functions
 
-nogil = os.environ.get("BM25S_NOGIL", "0") == "1"
+VAR_NOGIL = os.environ.get("BM25S_NOGIL", "0") == "1"
 
 try:
     from numba import njit
@@ -1344,7 +1344,7 @@ class BM25:
         from .scoring import _compute_relevance_from_scores_jit_ready
 
         self._compute_relevance_from_scores = njit(
-            _compute_relevance_from_scores_jit_ready, nogil=nogil
+            _compute_relevance_from_scores_jit_ready, nogil=VAR_NOGIL
         )
 
     def activate_numba_csc(self):
@@ -1362,7 +1362,7 @@ class BM25:
                 "Numba is not installed. Please install Numba to use the Numba accelerator with `pip install numba`."
             )
         # Assign the compiled function to the instance, replacing the static method
-        self._np_csc = njit(_np_csc_jit_ready, nogil=nogil)
+        self._np_csc = njit(_np_csc_jit_ready, nogil=VAR_NOGIL)
 
     def warmup_numba_scorer(self):
         """
