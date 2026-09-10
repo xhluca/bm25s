@@ -11,8 +11,7 @@ from .selection import _numba_sorted_top_k
 
 _compute_relevance_from_scores_jit_ready = njit(nogil=VAR_NOGIL)(_compute_relevance_from_scores_jit_ready)
 
-@njit(parallel=True, nogil=VAR_NOGIL)
-def _retrieve_internal_jitted_parallel(
+def _retrieve_internal(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,
     k: int,
@@ -62,9 +61,9 @@ def _retrieve_internal_jitted_parallel(
     return topk_scores, topk_indices
 
 
-# Reuse the same implementation without launching a parallel region for one query.
-_retrieve_internal_jitted_single = njit(nogil=VAR_NOGIL)(
-    getattr(_retrieve_internal_jitted_parallel, "py_func", _retrieve_internal_jitted_parallel)
+_retrieve_internal_jitted_single = njit(nogil=VAR_NOGIL)(_retrieve_internal)
+_retrieve_internal_jitted_parallel = njit(parallel=True, nogil=VAR_NOGIL)(
+    _retrieve_internal
 )
 
 
