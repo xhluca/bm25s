@@ -97,11 +97,11 @@ BM25S_NOGIL=1 python your_script.py
 
 The default is `0` (disabled); only `1` enables it. The setting is read once at
 import time. Releasing the GIL lets other Python threads run during compiled
-calculations; it does not create threads. Single-query retrieval uses a serial
-Numba kernel, so independent queries can run via
-`await asyncio.to_thread(retriever.retrieve, [query_tokens], k=10)` with
-`backend="numba"`. Batched retrieval still uses Numba parallelization; concurrent
-batch calls require a thread-safe threading layer (`workqueue` is not supported).
+calculations; it does not create threads. Enabling it also disables Numba's
+internal batch parallelism, letting the caller manage concurrency, for example
+with `await asyncio.to_thread(retriever.retrieve, [query_tokens], k=10)` and
+`backend="numba"`. This works with Numba's `workqueue` threading layer. Leave it
+disabled to retain the default internal batch parallelism.
 
 ## Quickstart
 

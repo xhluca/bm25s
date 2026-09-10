@@ -11,7 +11,8 @@ from .selection import _numba_sorted_top_k
 
 _compute_relevance_from_scores_jit_ready = njit(nogil=VAR_NOGIL)(_compute_relevance_from_scores_jit_ready)
 
-def _retrieve_internal(
+@njit(parallel=not VAR_NOGIL, nogil=VAR_NOGIL)
+def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,
     k: int,
@@ -59,12 +60,6 @@ def _retrieve_internal(
         topk_indices[i] = topk_indices_sing
 
     return topk_scores, topk_indices
-
-
-_retrieve_internal_jitted_single = njit(nogil=VAR_NOGIL)(_retrieve_internal)
-_retrieve_internal_jitted_parallel = njit(parallel=True, nogil=VAR_NOGIL)(
-    _retrieve_internal
-)
 
 
 def _retrieve_numba_functional(
@@ -120,12 +115,7 @@ def _retrieve_numba_functional(
     query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=int_dtype)
     query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(int_dtype)
 
-    retrieve = (
-        _retrieve_internal_jitted_single
-        if len(query_tokens_ids) == 1
-        else _retrieve_internal_jitted_parallel
-    )
-    retrieved_scores, retrieved_indices = retrieve(
+    retrieved_scores, retrieved_indices = _retrieve_internal_jitted_parallel(
         query_pointers=query_pointers,
         query_tokens_ids_flat=query_tokens_ids_flat,
         k=k,

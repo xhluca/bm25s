@@ -25,7 +25,6 @@ functions = [
     retriever._np_csc,
     retrieve_utils._compute_relevance_from_scores_jit_ready,
     retrieve_utils._retrieve_internal_jitted_parallel,
-    retrieve_utils._retrieve_internal_jitted_single,
     selection._numba_unsorted_top_k_legacy,
     selection._numba_sorted_top_k,
     selection.sift_down,
@@ -43,7 +42,7 @@ for backend in ("numpy", "numba"):
     np.testing.assert_array_equal(result.documents, [[1]])
     assert result.scores[0, 0] > 0
 
-assert not retrieve_utils._retrieve_internal_jitted_single.targetoptions.get("parallel", False)
+assert retrieve_utils._retrieve_internal_jitted_parallel.targetoptions["parallel"] == (not expected)
 queries = [["cat"], ["dog"], ["fish"]]
 kwargs = dict(k=1, n_threads=1, show_progress=False)
 baseline = retriever.retrieve(queries, **kwargs)
@@ -65,7 +64,8 @@ async def check_concurrent_queries():
                 np.testing.assert_array_equal(result.documents, baseline.documents[i:i+1])
                 np.testing.assert_allclose(result.scores, baseline.scores[i:i+1])
 
-asyncio.run(check_concurrent_queries())
+if expected:
+    asyncio.run(check_concurrent_queries())
 """
         for value in (None, "0", "1"):
             with self.subTest(BM25S_NOGIL=value):
