@@ -62,6 +62,12 @@ def _retrieve_internal_jitted_parallel(
     return topk_scores, topk_indices
 
 
+# Reuse the same implementation without launching a parallel region for one query.
+_retrieve_internal_jitted_single = njit(nogil=VAR_NOGIL)(
+    getattr(_retrieve_internal_jitted_parallel, "py_func", _retrieve_internal_jitted_parallel)
+)
+
+
 def _retrieve_numba_functional(
     query_tokens_ids,
     scores,
@@ -115,7 +121,12 @@ def _retrieve_numba_functional(
     query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=int_dtype)
     query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(int_dtype)
 
-    retrieved_scores, retrieved_indices = _retrieve_internal_jitted_parallel(
+    retrieve = (
+        _retrieve_internal_jitted_single
+        if len(query_tokens_ids) == 1
+        else _retrieve_internal_jitted_parallel
+    )
+    retrieved_scores, retrieved_indices = retrieve(
         query_pointers=query_pointers,
         query_tokens_ids_flat=query_tokens_ids_flat,
         k=k,
