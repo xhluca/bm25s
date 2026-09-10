@@ -686,6 +686,7 @@ class BM25:
         chunksize: int = 50,
         backend_selection: str = "auto",
         weight_mask: np.ndarray = None,
+        nogil: bool = False,
     ):
         """
         Retrieve the top-k documents for each query (tokenized).
@@ -741,6 +742,10 @@ class BM25:
         weight_mask : np.ndarray
             A weight mask to filter the documents. If provided, the scores for the masked
             documents will be set to 0 to avoid returning them in the results.
+
+        nogil : bool
+            Release the GIL in the Numba retrieval backend. Defaults to False.
+            For the NumPy backend, configure the scorer with compile(nogil=True).
 
         Returns
         -------
@@ -879,6 +884,7 @@ class BM25:
                 int_dtype=self.int_dtype,
                 nonoccurrence_array=self.nonoccurrence_array,
                 weight_mask=weight_mask,
+                nogil=nogil,
             )
 
             if return_as == "tuple":

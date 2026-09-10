@@ -6,11 +6,13 @@ https://github.com/AmenRa/retriv/blob/v0.2.1/retriv/utils/numba_utils.py
 numba_sorted_top_k was created based on numba_unsorted_top_k, but modified to use a heap to keep track of the top-k values.
 """
 
+from functools import lru_cache
+
 import numpy as np
 from numba import njit
 
 
-@njit(nogil=True)
+@njit()
 def _numba_unsorted_top_k_legacy(array: np.ndarray, k: int):
     top_k_values = np.zeros(k, dtype=np.float32)
     top_k_indices = np.zeros(k, dtype=np.int32)
@@ -28,7 +30,7 @@ def _numba_unsorted_top_k_legacy(array: np.ndarray, k: int):
     return top_k_values, top_k_indices
 
 
-@njit(nogil=True)
+@njit()
 def sift_down(values, indices, startpos, pos):
     new_value = values[pos]
     new_index = indices[pos]
@@ -45,7 +47,7 @@ def sift_down(values, indices, startpos, pos):
     indices[pos] = new_index
 
 
-@njit(nogil=True)
+@njit()
 def sift_up(values, indices, pos, length):
     startpos = pos
     new_value = values[pos]
@@ -64,14 +66,14 @@ def sift_up(values, indices, pos, length):
     sift_down(values, indices, startpos, pos)
 
 
-@njit(nogil=True)
+@njit()
 def heap_push(values, indices, value, index, length):
     values[length] = value
     indices[length] = index
     sift_down(values, indices, 0, length)
 
 
-@njit(nogil=True)
+@njit()
 def heap_pop(values, indices, length):
     return_value = values[0]
     return_index = indices[0]
@@ -83,7 +85,7 @@ def heap_pop(values, indices, length):
     return return_value, return_index
 
 
-@njit(nogil=True)
+@njit()
 def _numba_sorted_top_k(array: np.ndarray, k: int, sorted=True):
     n = len(array)
     if k > n:
@@ -124,17 +126,26 @@ def _numba_sorted_top_k(array: np.ndarray, k: int, sorted=True):
     return values, indices
 
 
-def topk(query_scores, k, backend="numba", sorted=True):
+@lru_cache(maxsize=2)
+def _get_top_k(nogil=False):
+    if not nogil:
+        return _numba_sorted_top_k
+    return njit(nogil=nogil)(
+        getattr(_numba_sorted_top_k, "py_func", _numba_sorted_top_k)
+    )
+
+
+def topk(query_scores, k, backend="numba", sorted=True, nogil=False):
     """
     This function is used to retrieve the top-k results for a single query. It will only work
-    on a 1-dimensional array of scores.
+    on a 1-dimensional array of scores. Set nogil=True to release the GIL.
     """
     if backend not in ["numba"]:
         raise ValueError(
             "Invalid backend. Only 'numba' is supported."
         )
     elif backend == "numba":
-        uns_scores, uns_indices = _numba_sorted_top_k(query_scores, k)
+        uns_scores, uns_indices = _get_top_k(nogil)(query_scores, k)
         if sorted:
             sorted_inds = np.flip(np.argsort(uns_scores))
             query_inds = uns_indices[sorted_inds]

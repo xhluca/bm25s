@@ -1,5 +1,7 @@
 import os
 from numba import njit, prange
+from functools import lru_cache
+
 import numpy as np
 from typing import List, Tuple, Any
 import logging
@@ -8,9 +10,9 @@ from .. import utils
 from ..scoring import _compute_relevance_from_scores_jit_ready
 from .selection import _numba_sorted_top_k
 
-_compute_relevance_from_scores_jit_ready = njit(nogil=True)(_compute_relevance_from_scores_jit_ready)
+_compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
 
-@njit(parallel=True, nogil=True)
+@njit(parallel=True)
 def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,
@@ -61,6 +63,15 @@ def _retrieve_internal_jitted_parallel(
     return topk_scores, topk_indices
 
 
+@lru_cache(maxsize=2)
+def _get_retriever(nogil=False):
+    if not nogil:
+        return _retrieve_internal_jitted_parallel
+    return njit(parallel=True, nogil=nogil)(
+        getattr(_retrieve_internal_jitted_parallel, "py_func", _retrieve_internal_jitted_parallel)
+    )
+
+
 def _retrieve_numba_functional(
     query_tokens_ids,
     scores,
@@ -77,6 +88,7 @@ def _retrieve_numba_functional(
     dtype="float32",
     int_dtype="int32",
     weight_mask=None,
+    nogil=False,
 ):  
     from numba import get_num_threads, set_num_threads, njit
 
@@ -114,7 +126,7 @@ def _retrieve_numba_functional(
     query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=int_dtype)
     query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(int_dtype)
 
-    retrieved_scores, retrieved_indices = _retrieve_internal_jitted_parallel(
+    retrieved_scores, retrieved_indices = _get_retriever(nogil)(
         query_pointers=query_pointers,
         query_tokens_ids_flat=query_tokens_ids_flat,
         k=k,
