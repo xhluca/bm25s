@@ -86,6 +86,21 @@ pip install "bm25s[full]"
 
 ```
 
+### Releasing the GIL with Numba
+
+Set `BM25S_NOGIL=1` before importing `bm25s` to enable `nogil` for all its
+Numba-compiled functions:
+
+```bash
+BM25S_NOGIL=1 python your_script.py
+```
+
+The default is `0` (disabled); only `1` enables it. The setting is read once at
+import time. Releasing the GIL lets other Python threads run during compiled
+calculations; it does not create threads. Concurrent calls to the parallel
+Numba retrieval backend require a thread-safe Numba threading layer;
+`workqueue` does not support them, even with `n_threads=1`.
+
 ## Quickstart
 
 Here is a simple example of how to use `bm25s`:

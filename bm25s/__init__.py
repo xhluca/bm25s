@@ -12,6 +12,8 @@ import numpy as np
 
 from .utils import json_functions as json_functions
 
+nogil = os.environ.get("BM25S_NOGIL", "0") == "1"
+
 try:
     from numba import njit
     from .numba import selection as selection_jit
@@ -686,7 +688,6 @@ class BM25:
         chunksize: int = 50,
         backend_selection: str = "auto",
         weight_mask: np.ndarray = None,
-        nogil: bool = False,
     ):
         """
         Retrieve the top-k documents for each query (tokenized).
@@ -742,10 +743,6 @@ class BM25:
         weight_mask : np.ndarray
             A weight mask to filter the documents. If provided, the scores for the masked
             documents will be set to 0 to avoid returning them in the results.
-
-        nogil : bool
-            Release the GIL in the Numba retrieval backend. Defaults to False.
-            For the NumPy backend, configure the scorer with compile(nogil=True).
 
         Returns
         -------
@@ -884,7 +881,6 @@ class BM25:
                 int_dtype=self.int_dtype,
                 nonoccurrence_array=self.nonoccurrence_array,
                 weight_mask=weight_mask,
-                nogil=nogil,
             )
 
             if return_as == "tuple":
@@ -1295,7 +1291,7 @@ class BM25:
         """
         return _np_csc_python(data, rows, cols, shape)
 
-    def compile(self, activate_numba=True, warmup=False, nogil=False):
+    def compile(self, activate_numba=True, warmup=False):
         """
         Compile the Numba functions for the BM25 index. This will apply the Numba JIT
         compilation to the `_compute_relevance_from_scores` function and the CSC builder,
@@ -1307,21 +1303,19 @@ class BM25:
         Behind the scenes, this will reassign the `_compute_relevance_from_scores` method
         to the JIT-compiled version of the function, and the `_np_csc` method to the
         JIT-compiled version of the CSC builder.
-
-        Set ``nogil=True`` to release the GIL while the compiled functions run.
         """
         if NUMBA_AVAILABLE is False:
             raise ImportError(
                 "Numba is not installed. Please install Numba to compile the BM25 index with `pip install numba`."
             )
         if activate_numba:
-            self.activate_numba_csc(nogil=nogil)
-            self.activate_numba_scorer(nogil=nogil)
+            self.activate_numba_csc()
+            self.activate_numba_scorer()
         if warmup:
             self.warmup_numba_csc()
             self.warmup_numba_scorer()
     
-    def activate_numba_scorer(self, nogil=False):
+    def activate_numba_scorer(self):
         """
         Activate the Numba scorer for the BM25 index. This will apply the Numba JIT
         compilation to the `_compute_relevance_from_scores` function, which will speed
@@ -1335,8 +1329,6 @@ class BM25:
 
         Behind the scenes, this will reassign the `_compute_relevance_from_scores` method
         to the JIT-compiled version of the function.
-
-        Set ``nogil=True`` to release the GIL while the compiled scorer runs.
         """
         try:
             from numba import njit
@@ -1355,14 +1347,13 @@ class BM25:
             _compute_relevance_from_scores_jit_ready, nogil=nogil
         )
 
-    def activate_numba_csc(self, nogil=False):
+    def activate_numba_csc(self):
         """
         Activate the Numba accelerator for CSC matrix construction. 
         This will apply Numba JIT compilation to the CSC builder, significantly
         speeding up index construction.
         
         This function requires the `numba` package.
-        Set ``nogil=True`` to release the GIL while the compiled builder runs.
         """
         try:
             from numba import njit

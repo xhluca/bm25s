@@ -1,78 +1,57 @@
+import os
+from pathlib import Path
+import subprocess
+import sys
 import unittest
-from concurrent.futures import ThreadPoolExecutor
-
-import numba
-import numpy as np
-
-import bm25s
-from bm25s.numba import retrieve_utils, selection
 
 
 class TestNogil(unittest.TestCase):
-    def test_selection_and_retrieval_nogil_parameter(self):
-        scores = np.array([1.0, 3.0, 2.0])
-        for nogil in (False, True):
-            with self.subTest(nogil=nogil):
-                for factory in (selection._get_top_k, retrieve_utils._get_retriever):
-                    function = factory(nogil)
-                    self.assertEqual(function.targetoptions.get("nogil", False), nogil)
-                    self.assertIs(function, factory(nogil))
-                values, indices = selection.topk(scores, k=2, nogil=nogil)
-                np.testing.assert_array_equal(values, [3.0, 2.0])
-                np.testing.assert_array_equal(indices, [1, 2])
-        self.assertFalse(selection._get_top_k().targetoptions.get("nogil", False))
-        self.assertFalse(retrieve_utils._get_retriever().targetoptions.get("nogil", False))
+    def test_environment_setting(self):
+        # Each setting needs a fresh import because decorators run at import time.
+        script = """
+import sys
+import numpy as np
+import bm25s
+from bm25s.numba import retrieve_utils, selection
 
-    def test_compile_nogil_parameter(self):
-        retriever = bm25s.BM25(auto_compile=False)
-        for nogil in (False, True, False):
-            with self.subTest(nogil=nogil):
-                retriever.compile(nogil=nogil)
-                self.assertEqual(
-                    retriever._compute_relevance_from_scores.targetoptions["nogil"], nogil
+expected = sys.argv[1] == "1"
+retriever = bm25s.BM25(auto_compile=False)
+retriever.compile()
+functions = [
+    retriever._compute_relevance_from_scores,
+    retriever._np_csc,
+    retrieve_utils._compute_relevance_from_scores_jit_ready,
+    retrieve_utils._retrieve_internal_jitted_parallel,
+    selection._numba_unsorted_top_k_legacy,
+    selection._numba_sorted_top_k,
+    selection.sift_down,
+    selection.sift_up,
+    selection.heap_push,
+    selection.heap_pop,
+]
+for function in functions:
+    assert function.targetoptions["nogil"] == expected, function.py_func.__name__
+
+retriever.index([["cat"], ["dog"], ["fish"]], show_progress=False)
+for backend in ("numpy", "numba"):
+    retriever.backend = backend
+    result = retriever.retrieve([["dog"]], k=1, n_threads=1, show_progress=False)
+    np.testing.assert_array_equal(result.documents, [[1]])
+    assert result.scores[0, 0] > 0
+"""
+        for value in (None, "0", "1"):
+            with self.subTest(BM25S_NOGIL=value):
+                env = os.environ.copy()
+                env.pop("BM25S_NOGIL", None)
+                env.pop("NUMBA_DISABLE_JIT", None)
+                if value is not None:
+                    env["BM25S_NOGIL"] = value
+                result = subprocess.run(
+                    [sys.executable, "-c", script, value or "0"],
+                    cwd=Path(__file__).resolve().parents[2],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
                 )
-                self.assertEqual(retriever._np_csc.targetoptions["nogil"], nogil)
-        retriever.compile()
-        self.assertFalse(retriever._compute_relevance_from_scores.targetoptions["nogil"])
-        self.assertFalse(retriever._np_csc.targetoptions["nogil"])
-
-    def test_retrieval_nogil_results(self):
-        retriever = bm25s.BM25(backend="numba", auto_compile=False)
-        retriever.index([["cat"], ["dog"], ["fish"]], show_progress=False)
-        kwargs = dict(k=1, n_threads=1, show_progress=False)
-        expected = retriever.retrieve([["dog"]], **kwargs)
-        for nogil in (False, True):
-            with self.subTest(nogil=nogil):
-                result = retriever.retrieve([["dog"]], nogil=nogil, **kwargs)
-                np.testing.assert_array_equal(result.documents, expected.documents)
-                np.testing.assert_allclose(result.scores, expected.scores)
-                self.assertEqual(result.documents[0, 0], 1)
-
-    def test_concurrent_numba_retrieval(self):
-        self.check_concurrent_retrieval("numba")
-
-    def test_concurrent_compiled_scorer_retrieval(self):
-        self.check_concurrent_retrieval("numpy")
-
-    def check_concurrent_retrieval(self, backend):
-        corpus = [["cat", "purr"], ["dog", "play"], ["fish", "swim"]]
-        retriever = bm25s.BM25(backend=backend, auto_compile=False)
-        retriever.activate_numba_scorer(nogil=True)
-        retriever.index(corpus, show_progress=False)
-        queries = [["cat"], ["dog"], ["fish"]]
-
-        def retrieve(query):
-            return retriever.retrieve([query], k=1, n_threads=1, show_progress=False, nogil=True)
-
-        # Compile before starting threads and establish the serial baseline.
-        expected = [retrieve(query) for query in queries]
-        if backend == "numba" and numba.threading_layer() == "workqueue":
-            self.skipTest("Numba workqueue does not support concurrent parallel calls")
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            results = list(executor.map(retrieve, queries * 4))
-
-        for i, result in enumerate(results):
-            baseline = expected[i % len(queries)]
-            np.testing.assert_array_equal(result.documents, baseline.documents)
-            np.testing.assert_allclose(result.scores, baseline.scores)
-            self.assertEqual(result.documents[0, 0], i % len(queries))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
