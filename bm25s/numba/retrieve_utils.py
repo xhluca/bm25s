@@ -8,9 +8,9 @@ from .. import utils
 from ..scoring import _compute_relevance_from_scores_jit_ready
 from .selection import _numba_sorted_top_k
 
-_compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
+_compute_relevance_from_scores_jit_ready = njit(nogil=True)(_compute_relevance_from_scores_jit_ready)
 
-@njit(parallel=True)
+@njit(parallel=True, nogil=True)
 def _retrieve_internal_jitted_parallel(
     query_tokens_ids_flat: np.ndarray,
     query_pointers: np.ndarray,

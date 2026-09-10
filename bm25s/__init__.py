@@ -1342,7 +1342,7 @@ class BM25:
         from .scoring import _compute_relevance_from_scores_jit_ready
 
         self._compute_relevance_from_scores = njit(
-            _compute_relevance_from_scores_jit_ready
+            _compute_relevance_from_scores_jit_ready, nogil=True
         )
 
     def activate_numba_csc(self):
@@ -1360,7 +1360,7 @@ class BM25:
                 "Numba is not installed. Please install Numba to use the Numba accelerator with `pip install numba`."
             )
         # Assign the compiled function to the instance, replacing the static method
-        self._np_csc = njit(_np_csc_jit_ready)
+        self._np_csc = njit(_np_csc_jit_ready, nogil=True)
 
     def warmup_numba_scorer(self):
         """
