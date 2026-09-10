@@ -11,8 +11,8 @@ from bm25s.numba import retrieve_utils, selection
 class TestNogil(unittest.TestCase):
     def test_jit_functions_release_gil(self):
         retriever = bm25s.BM25(auto_compile=False)
-        retriever.activate_numba_scorer()
-        retriever.activate_numba_csc()
+        retriever.activate_numba_scorer(nogil=True)
+        retriever.activate_numba_csc(nogil=True)
         functions = [
             retriever._compute_relevance_from_scores,
             retriever._np_csc,
@@ -29,6 +29,19 @@ class TestNogil(unittest.TestCase):
             with self.subTest(function=function.py_func.__name__):
                 self.assertTrue(function.targetoptions.get("nogil", False))
 
+    def test_compile_nogil_parameter(self):
+        retriever = bm25s.BM25(auto_compile=False)
+        for nogil in (False, True, False):
+            with self.subTest(nogil=nogil):
+                retriever.compile(nogil=nogil)
+                self.assertEqual(
+                    retriever._compute_relevance_from_scores.targetoptions["nogil"], nogil
+                )
+                self.assertEqual(retriever._np_csc.targetoptions["nogil"], nogil)
+        retriever.compile()
+        self.assertFalse(retriever._compute_relevance_from_scores.targetoptions["nogil"])
+        self.assertFalse(retriever._np_csc.targetoptions["nogil"])
+
     def test_concurrent_numba_retrieval(self):
         self.check_concurrent_retrieval("numba")
 
@@ -38,7 +51,7 @@ class TestNogil(unittest.TestCase):
     def check_concurrent_retrieval(self, backend):
         corpus = [["cat", "purr"], ["dog", "play"], ["fish", "swim"]]
         retriever = bm25s.BM25(backend=backend, auto_compile=False)
-        retriever.activate_numba_scorer()
+        retriever.activate_numba_scorer(nogil=True)
         retriever.index(corpus, show_progress=False)
         queries = [["cat"], ["dog"], ["fish"]]
 
