@@ -7,6 +7,11 @@ import tempfile
 import numpy as np
 import bm25s
 import Stemmer  # optional: for stemming
+from tests.core import test_retrieve
+
+
+class TestNumbaRetrieveCorpusItems(test_retrieve.TestRetrieveCorpusItems):
+    backend = "numba"
 
 class TestNumbaBackendRetrieve(unittest.TestCase):
     @classmethod
