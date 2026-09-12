@@ -8,6 +8,82 @@ import numpy as np
 import bm25s
 import Stemmer  # optional: for stemming
 
+
+class TestRetrieveCorpusItems(unittest.TestCase):
+    backend = "numpy"
+
+    def setUp(self):
+        self.retriever = bm25s.BM25(backend=self.backend, auto_compile=False)
+        self.retriever.index([["cat"], ["dog"], ["fish"]], show_progress=False)
+        self.queries = [["cat"], ["fish"]]
+        self.expected = self.retriever.retrieve(self.queries, k=2, show_progress=False)
+        self.assertTrue(np.issubdtype(self.expected.documents.dtype, np.integer))
+
+    def assert_corpus_results(self, retriever, corpus):
+        for return_as in ("tuple", "documents"):
+            with self.subTest(return_as=return_as):
+                result = retriever.retrieve(
+                    self.queries,
+                    corpus=corpus,
+                    k=2,
+                    return_as=return_as,
+                    show_progress=False,
+                )
+                documents = result.documents if return_as == "tuple" else result
+                self.assertEqual(documents.shape, self.expected.documents.shape)
+                if isinstance(corpus, np.ndarray):
+                    self.assertEqual(documents.dtype, corpus.dtype)
+                else:
+                    self.assertEqual(documents.dtype, np.dtype(object))
+                for position in np.ndindex(documents.shape):
+                    doc_id = self.expected.documents[position]
+                    expected_document = corpus[int(doc_id)]
+                    self.assertEqual(documents[position], expected_document)
+                    self.assertIs(type(documents[position]), type(expected_document))
+                    if isinstance(expected_document, (list, tuple, dict)) and not isinstance(
+                        corpus, bm25s.utils.corpus.JsonlCorpus
+                    ):
+                        self.assertIs(documents[position], expected_document)
+                if return_as == "tuple":
+                    np.testing.assert_array_equal(result.scores, self.expected.scores)
+
+    def test_retrieve_preserves_corpus_items(self):
+        corpora = [
+            [["cat", "first"], ["dog", "second"], ["fish", "third"]],
+            [("cat", 1), ("dog", 2), ("fish", 3)],
+            [["cat"], ["dog", "second"], ["fish", "third", 3]],
+            [[], [], []],
+            [1, "second", 3],
+            [{"text": "cat"}, {"text": "dog"}, {"text": "fish"}],
+            ["cat", "dog", "fish"],
+            [1, 2, 3],
+            np.array(["cat", "dog", "fish"]),
+            np.array([1, 2, 3], dtype=np.int32),
+        ]
+        for corpus in corpora:
+            with self.subTest(corpus=corpus):
+                self.assert_corpus_results(self.retriever, corpus)
+
+    def test_retrieve_preserves_saved_list_items(self):
+        corpus = [["cat", 1], ["dog", 2], ["fish", 3]]
+        with tempfile.TemporaryDirectory() as path:
+            self.retriever.save(path, corpus=corpus, show_progress=False)
+            for mmap in (False, True):
+                with self.subTest(mmap=mmap):
+                    loaded = bm25s.BM25.load(
+                        path,
+                        load_corpus=True,
+                        mmap=mmap,
+                        show_progress=False,
+                        auto_compile=False,
+                    )
+                    try:
+                        self.assert_corpus_results(loaded, loaded.corpus)
+                    finally:
+                        if mmap:
+                            loaded.corpus.close()
+
+
 class TestBM25SLoadingSaving(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

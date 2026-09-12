@@ -177,7 +177,10 @@ class JsonlCorpus:
             # was a list, and then reshape it back to the original shape
             index_flat = index.flatten().tolist()
             results = [self.__getitem__(i) for i in index_flat]
-            reshaped = np.array(results).reshape(index.shape)
+            # JSON arrays are corpus entries, not extra dimensions of the result.
+            reshaped = np.empty(len(results), dtype=object)
+            reshaped[:] = results
+            reshaped = reshaped.reshape(index.shape)
             return reshaped
         
         raise TypeError("Invalid index type")

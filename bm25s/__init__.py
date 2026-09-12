@@ -929,7 +929,10 @@ class BM25:
             else:
                 index_flat = indices.flatten().tolist()
                 results = [corpus[i] for i in index_flat]
-                retrieved_docs = np.array(results).reshape(indices.shape)
+                # Keep each corpus entry intact, even when it is a list or tuple.
+                retrieved_docs = np.empty(len(results), dtype=object)
+                retrieved_docs[:] = results
+                retrieved_docs = retrieved_docs.reshape(indices.shape)
 
         if return_as == "tuple":
             return Results(documents=retrieved_docs, scores=scores)

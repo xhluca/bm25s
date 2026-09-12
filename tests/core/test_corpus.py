@@ -221,6 +221,29 @@ class TestJsonlCorpus(unittest.TestCase):
         
         corpus.close()
 
+    def test_jsonl_corpus_ndarray_preserves_list_items(self):
+        documents = [["cat", 1], ["dog"], []]
+        with open(self.test_file, "w", encoding="utf-8") as f:
+            for document in documents:
+                f.write(json_functions.dumps(document) + "\n")
+
+        corpus = JsonlCorpus(self.test_file, show_progress=False)
+        try:
+            for indices in (
+                np.array([2, 0]),
+                np.array([[0, 1], [2, 0]]),
+                np.array([[[1, 2]]]),
+                np.empty((0, 2), dtype=int),
+                np.array(1),
+            ):
+                with self.subTest(shape=indices.shape):
+                    result = corpus[indices]
+                    self.assertEqual(result.shape, indices.shape)
+                    for position in np.ndindex(indices.shape):
+                        self.assertEqual(result[position], documents[indices[position]])
+        finally:
+            corpus.close()
+
     def test_jsonl_corpus_close_and_load(self):
         """Test JsonlCorpus close and load methods"""
         corpus = JsonlCorpus(self.test_file, show_progress=False, verbosity=0)
