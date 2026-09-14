@@ -1,5 +1,6 @@
 import os
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import unittest
 import tempfile
@@ -171,6 +172,43 @@ class TestNumbaBackendRetrieve(unittest.TestCase):
             # retrieve the top-k results
             top_k = 2
             retrieved = retriever.retrieve(query_tokens, k=top_k, return_as="tuple", weight_mask=weight_mask)
+
+    def test_e_retrieve_nogil_parallel_threads(self):
+        retriever = bm25s.BM25.load(
+            self.tmpdirname,
+            data_name="data.index.csc.npy",
+            indices_name="indices.index.csc.npy",
+            indptr_name="indptr.index.csc.npy",
+            vocab_name="vocab.json",
+            nnoc_name="nonoccurrence_array.npy",
+            params_name="params.json",
+            load_corpus=True,
+            auto_compile=False,
+        )
+        retriever.compile(activate_numba=True, warmup=False)
+
+        self.assertTrue(retriever.backend == "numba", "The backend should be 'numba'")
+
+        queries = [["my cat loves to purr"], ["a fish likes swimming"]]
+        query_tokens_list = [
+            bm25s.tokenize(query, stopwords="en", stemmer=self.stemmer)
+            for query in queries
+        ]
+        top_k = 2
+
+        def retrieve(query_tokens):
+            return retriever.retrieve(query_tokens, k=top_k, return_as="tuple", n_threads=1)
+
+        # Warm up JIT on the main thread so compilation is not raced.
+        expected_a, expected_b = [retrieve(query_tokens) for query_tokens in query_tokens_list]
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            retrieved_a, retrieved_b = executor.map(retrieve, query_tokens_list)
+
+        self.assertTrue(np.all(retrieved_a.scores == expected_a.scores), "The retrieved scores should be the same")
+        self.assertTrue(np.all(retrieved_a.documents == expected_a.documents), "The retrieved documents should be the same")
+        self.assertTrue(np.all(retrieved_b.scores == expected_b.scores), "The retrieved scores should be the same")
+        self.assertTrue(np.all(retrieved_b.documents == expected_b.documents), "The retrieved documents should be the same")
 
     @classmethod
     def tearDownClass(cls):
