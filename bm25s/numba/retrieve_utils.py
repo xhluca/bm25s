@@ -60,7 +60,7 @@ def _retrieve_internal_jitted(
     return topk_scores, topk_indices
 
 
-_retrieve_internal_jitted_parallel = njit(parallel=True, nogil=True)(_retrieve_internal_jitted)
+_retrieve_internal_jitted_parallel = njit(parallel=True)(_retrieve_internal_jitted)
 _retrieve_internal_jitted_serial = njit(nogil=True)(_retrieve_internal_jitted)
 
 
