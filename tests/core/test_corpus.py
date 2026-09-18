@@ -43,10 +43,15 @@ class TestCorpusUtilities(unittest.TestCase):
         result = change_extension(path, ".json")
         self.assertEqual(result, "/path/to/file.json")
         
-        # Test with no extension - rpartition returns ('', '', 'file'), so the original string is in the third element.
-        # If change_extension uses the first element, the result will be just the new extension.
-        path = "file"
-        result = change_extension(path, ".json")
+        for path, expected in [
+            ("file", "file.json"),
+            (".corpus", ".corpus.json"),
+            (os.path.join("data.v1", "corpus"), os.path.join("data.v1", "corpus.json")),
+            (os.path.join("data.v1", "corpus.jsonl"), os.path.join("data.v1", "corpus.json")),
+            ("corpus.backup.jsonl", "corpus.backup.json"),
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(change_extension(path, ".json"), expected)
 
     def test_find_newline_positions(self):
         """Test find_newline_positions"""
@@ -134,6 +139,30 @@ class TestJsonlCorpus(unittest.TestCase):
         corpus2 = JsonlCorpus(self.test_file, show_progress=False, save_index=False)
         self.assertEqual(len(corpus2), 5)
         corpus2.close()
+
+    def test_extensionless_corpora_have_independent_indexes(self):
+        directory = os.path.join(self.tmpdir, "data.v1")
+        os.makedirs(directory)
+        sources = [
+            (os.path.join(directory, "first"), [{"text": "one"}, {"text": "two"}]),
+            (os.path.join(directory, "second"), [{"text": "another document"}]),
+        ]
+        for path, documents in sources:
+            with open(path, "w", encoding="utf-8") as handle:
+                for document in documents:
+                    handle.write(json_functions.dumps(document) + "\n")
+
+        # Verify both newly created and persisted indexes without sharing offsets.
+        for _ in range(2):
+            for path, documents in sources:
+                corpus = JsonlCorpus(path, show_progress=False, verbosity=0)
+                try:
+                    self.assertEqual(len(corpus), len(documents))
+                    self.assertEqual(corpus[:], documents)
+                finally:
+                    corpus.close()
+        for path, _ in sources:
+            self.assertTrue(os.path.isfile(path + ".mmindex.json"))
 
     def test_jsonl_corpus_len(self):
         """Test JsonlCorpus __len__"""
