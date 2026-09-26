@@ -354,7 +354,10 @@ class BM25:
                 f"Invalid csc_backend value: {self.csc_backend}. Choose from 'scipy', 'numpy'."
             )
 
-        avg_doc_len = np.array([len(doc_ids) for doc_ids in corpus_token_ids]).mean()
+        # An empty corpus (no documents) has no mean document length; default to 0
+        # instead of letting numpy emit a RuntimeWarning and produce NaN.
+        _doc_lengths = np.array([len(doc_ids) for doc_ids in corpus_token_ids])
+        avg_doc_len = _doc_lengths.mean() if _doc_lengths.size > 0 else 0.0
         n_docs = len(corpus_token_ids)
         n_vocab = len(unique_token_ids)
 
@@ -561,7 +564,10 @@ class BM25:
 
         if create_empty_token:
             if inferred_corpus_obj != "token_ids" and "" not in vocab_dict:
-                vocab_dict[""] = max(vocab_dict.values()) + 1
+                # An empty corpus (no documents, or only token-less documents)
+                # yields an empty vocabulary, where max() raises
+                # "max() iterable argument is empty". Seed the empty token at id 0.
+                vocab_dict[""] = (max(vocab_dict.values()) + 1) if vocab_dict else 0
 
         self.scores = scores
         self.vocab_dict = vocab_dict
