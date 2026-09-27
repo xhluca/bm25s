@@ -90,6 +90,12 @@ def get_line(
     else:
         CLOSE_MMAP = False
 
+    # An empty corpus has no mmap view; there is simply no line to read.
+    if mmap_obj is None:
+        if CLOSE_FILE:
+            file_obj.close()
+        return ""
+
     mmap_obj.seek(mmindex[index])
     result = mmap_obj.readline().decode(encoding)
 
@@ -154,6 +160,11 @@ class JsonlCorpus:
         return len(self.mmindex)
 
     def __getitem__(self, index):
+        # An empty corpus has no lines: integer indexing is out of range, mirroring a
+        # regular empty list. Slice/list/ndarray indexing return an empty result.
+        if len(self.mmindex) == 0 and isinstance(index, int):
+            raise IndexError("index out of range for empty JsonlCorpus")
+
         # handle multiple indices
         if isinstance(index, int):
             return json_functions.loads(
@@ -212,7 +223,13 @@ class JsonlCorpus:
         self.close()  # close any existing file and mmap objects
 
         self.file_obj = open(self.path, "r", encoding=self.encoding)
-        self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
+        # mmap cannot map a zero-length file (ValueError: cannot mmap an empty file).
+        # An empty .jsonl is a valid empty corpus with length 0 and no lines to read,
+        # so keep the mmap view None and let get_line return "" for an empty index.
+        if os.fstat(self.file_obj.fileno()).st_size > 0:
+            self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
+        else:
+            self.mmap_obj = None
         if self.verbosity >= 1:
             logging.info("Opened file and mmap objects")
     
