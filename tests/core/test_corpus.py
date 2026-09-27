@@ -301,5 +301,45 @@ class TestJsonlCorpus(unittest.TestCase):
         corpus.close()
 
 
+class TestJsonlCorpusEmptyFile(unittest.TestCase):
+    """An empty (zero-byte) .jsonl is a valid empty corpus.
+
+    mmap cannot map a zero-length file, so JsonlCorpus previously raised
+    ``ValueError: cannot mmap an empty file`` on construction.
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.empty_file = os.path.join(self.tmpdir, "empty.jsonl")
+        open(self.empty_file, "w").close()  # zero bytes
+
+    def tearDown(self):
+        if os.path.exists(self.tmpdir):
+            shutil.rmtree(self.tmpdir)
+
+    def test_empty_file_does_not_crash(self):
+        corpus = JsonlCorpus(self.empty_file, show_progress=False, save_index=False)
+        self.assertEqual(len(corpus), 0)
+        corpus.close()
+
+    def test_empty_file_integer_index_raises_index_error(self):
+        # Mirror a built-in empty list: [][0] -> IndexError (not an mmap ValueError).
+        corpus = JsonlCorpus(self.empty_file, show_progress=False, save_index=False)
+        with self.assertRaises(IndexError):
+            _ = corpus[0]
+        corpus.close()
+
+    def test_empty_file_slice_is_empty(self):
+        corpus = JsonlCorpus(self.empty_file, show_progress=False, save_index=False)
+        self.assertEqual(corpus[0:5], [])
+        corpus.close()
+
+    def test_empty_file_can_be_closed_and_reopened(self):
+        corpus = JsonlCorpus(self.empty_file, show_progress=False, verbosity=0)
+        corpus.close()
+        corpus.load()
+        self.assertEqual(len(corpus), 0)
+        corpus.close()
+
 if __name__ == "__main__":
     unittest.main()
