@@ -79,11 +79,14 @@ def process_pr(repository, pr, today, request=api):
     created, cutoff, total, eligible = eligibility(login, today, request)
     policy_url = f"https://github.com/{repository}/blob/HEAD/CONTRIBUTING.md#contributor-eligibility"
     result = "met" if eligible else "not met"
+    status = "🟢" if eligible else "🔴"
+    age_status = "🟢" if created <= months_before(today, 6) else "🔴"
+    count_status = "🟢" if total >= 100 else "🔴"
     body = (
-        f"{MARKER}\nContributor eligibility requirements **{result}** for @{login}.\n\n"
-        f"- Account created: {created}; age: {(today - created).days} days "
+        f"{MARKER}\n{status} **Contributor eligibility requirements {result}** for @{login}.\n\n"
+        f"- {age_status} Account created: {created}; age: {(today - created).days} days "
         f"(required: at least six calendar months).\n"
-        f"- Contributions dated on or before {cutoff}: {total}"
+        f"- {count_status} Contributions dated on or before {cutoff}: {total}"
         f"{' or more' if total >= 100 else ''} (required: at least 100).\n\n"
         f"> {POLICY}\n\nSee [the contributor eligibility policy]({policy_url})."
     )

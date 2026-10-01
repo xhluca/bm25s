@@ -67,7 +67,7 @@ class TestContributorEligibility(unittest.TestCase):
         check.process_pr("owner/repo", self.pr, self.today, github)
         writes = [c for c in github.calls if c[2]]
         self.assertEqual(len(writes), 1)
-        self.assertIn("requirements **met**", writes[0][1]["body"])
+        self.assertIn("🟢 **Contributor eligibility requirements met**", writes[0][1]["body"])
         self.assertIn(check.POLICY, writes[0][1]["body"])
 
     def test_fail_replies_then_closes(self):
@@ -75,7 +75,7 @@ class TestContributorEligibility(unittest.TestCase):
         check.process_pr("owner/repo", self.pr, self.today, github)
         writes = [c for c in github.calls if c[2]]
         self.assertEqual([c[2] for c in writes], ["POST", "PATCH"])
-        self.assertIn("requirements **not met**", writes[0][1]["body"])
+        self.assertIn("🔴 **Contributor eligibility requirements not met**", writes[0][1]["body"])
         self.assertIn("CONTRIBUTING.md#contributor-eligibility", writes[0][1]["body"])
         self.assertEqual(writes[1][1], {"state": "closed"})
 
