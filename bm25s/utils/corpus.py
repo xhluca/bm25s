@@ -23,8 +23,9 @@ except ImportError:
 from . import json_functions
 
 def change_extension(path, new_extension):
+    """Replace the final filename extension, or append one if it has none."""
     path = str(path)
-    return path.rpartition(".")[0] + new_extension
+    return os.path.splitext(path)[0] + new_extension
 
 
 def find_newline_positions(path, show_progress=True, leave_progress=True, encoding="utf-8"):
