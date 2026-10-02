@@ -12,8 +12,11 @@ def dumps_with_builtin(d: dict, **kwargs) -> str:
 
 def dumps_with_orjson(d: dict, **kwargs) -> str:
     if kwargs.get("ensure_ascii", True):
-        # Simulate `ensure_ascii=True` by escaping non-ASCII characters
-        return orjson.dumps(d).decode("utf-8").encode("ascii", "backslashreplace").decode("utf-8")
+        # orjson has no `ensure_ascii`. Escaping non-ASCII with
+        # `backslashreplace` emitted `\xNN`, which is not a valid JSON escape,
+        # so the string could not be read back by `loads`. The stdlib emits
+        # `\uXXXX` instead, which every JSON reader accepts.
+        return json.dumps(d, **kwargs)
     # Ignore other kwargs not supported by orjson
     return orjson.dumps(d).decode("utf-8")
 
