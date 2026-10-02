@@ -6,13 +6,18 @@ try:
 except ImportError:
     ORJSON_AVAILABLE = False
     
+
 def dumps_with_builtin(d: dict, **kwargs) -> str:
     return json.dumps(d, **kwargs)
 
 def dumps_with_orjson(d: dict, **kwargs) -> str:
-    # orjson already emits valid JSON (UTF-8); re-encoding with
-    # backslashreplace produced \xNN escapes, which are not valid JSON, so any
-    # non-ASCII stopword list wrote a file that load_stopwords could not read.
+    if kwargs.get("ensure_ascii", True):
+        # orjson has no `ensure_ascii`. Escaping non-ASCII with
+        # `backslashreplace` emitted `\xNN`, which is not a valid JSON escape,
+        # so the string could not be read back by `loads`. The stdlib emits
+        # `\uXXXX` instead, which every JSON reader accepts.
+        return json.dumps(d, **kwargs)
+    # Ignore other kwargs not supported by orjson
     return orjson.dumps(d).decode("utf-8")
 
 if ORJSON_AVAILABLE:
@@ -23,3 +28,5 @@ else:
     def dumps(d: dict, **kwargs) -> str:
         return dumps_with_builtin(d, **kwargs)
     loads = json.loads
+
+
