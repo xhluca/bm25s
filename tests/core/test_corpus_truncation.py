@@ -39,6 +39,8 @@ class TestCorpusTruncation(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             corpus.load()
+        self.assertIsNone(corpus.file_obj)
+        self.assertIsNone(corpus.mmap_obj)
 
     def test_bm25_load_rejects_truncated_corpus_with_saved_index(self):
         documents = ["alpha beta", "gamma delta"]
