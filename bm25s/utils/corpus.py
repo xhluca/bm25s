@@ -91,12 +91,6 @@ def get_line(
     else:
         CLOSE_MMAP = False
 
-    # An empty corpus has no mmap view; there is simply no line to read.
-    if mmap_obj is None:
-        if CLOSE_FILE:
-            file_obj.close()
-        return ""
-
     mmap_obj.seek(mmindex[index])
     result = mmap_obj.readline().decode(encoding)
 
