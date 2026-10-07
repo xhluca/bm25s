@@ -607,15 +607,15 @@ class BM25:
             dtype=np.dtype(dtype),
         )
 
-        if weight_mask is not None:
-            # multiply the scores by the weight mask
-            scores *= weight_mask
-
         # if there's a non-occurrence array, we need to add the non-occurrence score
         # back to the scores
         if self.nonoccurrence_array is not None:
             nonoccurrence_scores = self.nonoccurrence_array[query_tokens_ids].sum()
             scores += nonoccurrence_scores
+
+        if weight_mask is not None:
+            # Apply document weights to the complete score, including non-occurrence.
+            scores *= weight_mask
 
         return scores
 
