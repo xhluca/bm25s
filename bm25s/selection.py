@@ -61,4 +61,6 @@ def topk(query_scores, k, backend="auto", sorted=True):
             raise ImportError("JAX is not available. Please install JAX with `pip install jax[cpu]` to use this backend.")
         return _topk_jax(query_scores, k)
     else:
+        if k < 0:
+            raise ValueError(f"k must be a non-negative integer, but got {k}.")
         return _topk_numpy(query_scores, k, sorted)
