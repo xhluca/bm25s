@@ -285,10 +285,15 @@ def _build_scores_and_indices_for_matrix(
             token_ids, dtype=dtype, int_dtype=int_dtype
         )
 
-        # Calculate the BM25 score for each token in the document
-        tfc = calculate_tfc(
-            tf_array=tf_array, l_d=doc_len, l_avg=avg_doc_len, k1=k1, b=b, delta=delta
-        )
+        # A token-less document contributes no term scores; skip the scorer
+        # (with l_d=l_avg=0 its divisions raise a spurious divide/invalid warning
+        # even though the result is empty).
+        if doc_len == 0:
+            tfc = np.empty(0, dtype=dtype)
+        else:
+            tfc = calculate_tfc(
+                tf_array=tf_array, l_d=doc_len, l_avg=avg_doc_len, k1=k1, b=b, delta=delta
+            )
         idf = idf_array[voc_ind_doc]
         scores_doc = idf * tfc
 
