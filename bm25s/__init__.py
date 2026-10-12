@@ -441,7 +441,7 @@ class BM25:
         return scores
 
     def build_index_from_tokens(
-        self, corpus_tokens, show_progress=True, leave_progress=False
+        self, corpus_tokens, show_progress=True, leave_progress=False, create_empty_token=False
     ):
         """
         Low-level function to build the BM25 index from tokens, used by the `index` method.
@@ -453,6 +453,15 @@ class BM25:
             leave_progress=leave_progress,
             desc="BM25S Create Vocab",
         )
+        # Reserve the seeded empty token as a real (zero-score) vocabulary column up
+        # front. Otherwise a token-less corpus yields an empty `unique_tokens`, the
+        # score matrix is built with zero columns, and the later
+        # `vocab_dict[""] = 0` seeding leaves an id (0) with no matching column --
+        # so even an ordinary query trips the "max token ID higher than the number
+        # of tokens" guard. Including it here keeps n_vocab, the idf array and the
+        # BM25L/BM25+ nonoccurrence array all consistently one column wide.
+        if create_empty_token and "" not in unique_tokens:
+            unique_tokens = list(unique_tokens) + [""]
         vocab_dict = {token: i for i, token in enumerate(unique_tokens)}
         unique_token_ids = [vocab_dict[token] for token in unique_tokens]
 
@@ -522,7 +531,8 @@ class BM25:
         if inferred_corpus_obj == "tokens":
             logger.debug(msg="Building index from tokens")
             scores, vocab_dict = self.build_index_from_tokens(
-                corpus, leave_progress=leave_progress, show_progress=show_progress
+                corpus, leave_progress=leave_progress, show_progress=show_progress,
+                create_empty_token=create_empty_token,
             )
         else:
             if inferred_corpus_obj == "tuple":
