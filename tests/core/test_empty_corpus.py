@@ -56,7 +56,10 @@ class TestBM25SEmptyCorpus(unittest.TestCase):
         # for the seeded empty token, so an ordinary (unmatched) query does not
         # trip the "max token ID higher than the number of tokens" guard and
         # instead returns every document with a zero score.
-        for backend in ("numpy", "numba"):
+        backends = ("numpy",)
+        if bm25s.NUMBA_AVAILABLE:
+            backends = ("numpy", "numba")
+        for backend in backends:
             retriever = bm25s.BM25(backend="numpy")
             retriever.index([[], [], []], show_progress=False)
             # The empty token now owns column 0: indptr has one column (len 2).
