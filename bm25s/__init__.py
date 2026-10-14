@@ -625,6 +625,9 @@ class BM25:
         if not isinstance(query_tokens_single, list):
             raise ValueError("The query_tokens must be a list of tokens.")
 
+        if not query_tokens_single:
+            return self.get_scores_from_ids([], weight_mask=weight_mask)
+
         if isinstance(query_tokens_single[0], str):
             query_tokens_ids = self.get_tokens_ids(query_tokens_single)
         elif isinstance(query_tokens_single[0], int):

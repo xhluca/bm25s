@@ -172,6 +172,18 @@ class TestBM25CoreFunctions(unittest.TestCase):
         self.assertIsInstance(scores, np.ndarray)
         self.assertEqual(len(scores), len(self.corpus))
 
+    def test_get_scores_with_stopword_only_query(self):
+        retriever = BM25(backend="numpy")
+        retriever.index(self.corpus_tokens, show_progress=False)
+        query_tokens = bm25s.tokenize(
+            "the and", return_ids=False, show_progress=False
+        )[0]
+
+        self.assertEqual(query_tokens, [])
+        np.testing.assert_array_equal(
+            retriever.get_scores(query_tokens), np.zeros(len(self.corpus))
+        )
+
     def test_get_scores_with_invalid_type(self):
         """Test get_scores with invalid input type"""
         retriever = BM25()
