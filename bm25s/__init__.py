@@ -951,7 +951,8 @@ class BM25:
         corpus_name="corpus.jsonl",
         allow_pickle=False,
         show_progress=True,
-        leave_progress=False
+        leave_progress=False,
+        raise_on_serialization_error=False,
     ):
         """
         Save the BM25S index to the `save_dir` directory. This will save the scores array,
@@ -1001,6 +1002,13 @@ class BM25:
 
         leave_progress : bool
             If True, the progress bar will remain after the function completes.
+
+        raise_on_serialization_error : bool, optional
+            If True, raise TypeError when a supported corpus entry cannot be serialized
+            to JSON, preserving the original exception as its cause. Defaults to False,
+            which logs a warning and skips the entry. Skipping entries can misalign the
+            saved corpus with the index. This option does not change the handling of
+            unsupported top-level entry types, which are still skipped.
         """
         # Save the self.vocab_dict and self.score_matrix to the save_dir
         save_dir = Path(save_dir)
@@ -1067,11 +1075,17 @@ class BM25:
                     try:
                         doc_str = json_functions.dumps(doc, ensure_ascii=False)
                     except Exception as e:
-                        raise TypeError(
-                            f"Document at index {i} could not be serialized to JSON "
-                            f"({type(e).__name__}: {e}). "
-                            "Skipping it would misalign the saved corpus with the index."
-                        ) from e
+                        if raise_on_serialization_error:
+                            raise TypeError(
+                                f"Document at index {i} could not be serialized to JSON "
+                                f"({type(e).__name__}: {e}). "
+                                "Skipping it would misalign the saved corpus with the index."
+                            ) from e
+                        logging.warning(
+                            f"Error saving document at index {i}: {e}. "
+                            "Skipping it may misalign the saved corpus with the index."
+                        )
+                        continue
                     f.write(doc_str + "\n")
 
             # also save corpus.mmindex
