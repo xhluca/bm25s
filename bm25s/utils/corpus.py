@@ -91,8 +91,10 @@ def get_line(
     else:
         CLOSE_MMAP = False
 
-    mmap_obj.seek(mmindex[index])
-    result = mmap_obj.readline().decode(encoding)
+    start = mmindex[index]
+    end = mmap_obj.find(b"\n", start)
+    end = len(mmap_obj) if end == -1 else end + 1
+    result = mmap_obj[start:end].decode(encoding)
 
     if CLOSE_MMAP:
         mmap_obj.close()
