@@ -2,6 +2,12 @@ import unittest
 import numpy as np
 from bm25s.selection import topk
 
+try:
+    from bm25s.numba.selection import topk as topk_numba
+    _NUMBA_AVAILABLE = True
+except ImportError:
+    _NUMBA_AVAILABLE = False
+
 
 class TestSelectionFunctions(unittest.TestCase):
     """Test coverage for selection.py functions"""
@@ -60,14 +66,39 @@ class TestSelectionFunctions(unittest.TestCase):
     def test_topk_auto_backend(self):
         """Test topk with auto backend selection"""
         query_scores = np.array([5.0, 2.0, 8.0, 1.0, 6.0], dtype=np.float32)
-        
+
         scores, indices = topk(query_scores, k=3, backend="auto", sorted=True)
-        
+
         # Should return top 3: 8.0, 6.0, 5.0
         self.assertEqual(len(scores), 3)
         self.assertEqual(len(indices), 3)
         # Check that the top score is 8.0
         self.assertEqual(scores[0], 8.0)
+
+    def test_topk_negative_k_raises(self):
+        """Negative k must raise a clear ValueError on every backend.
+
+        Before the fix, k<0 silently returned an empty selection on the numpy
+        backend and crashed with a confusing "negative dimensions" error on the
+        numba backend. k=0 intentionally returns an empty selection.
+        """
+        query_scores = np.array([3.0, 1.0, 4.0, 2.0], dtype=np.float32)
+        backends = [("numpy", lambda k: topk(query_scores, k=k, backend="numpy"))]
+        if _NUMBA_AVAILABLE:
+            backends.append(("numba", lambda k: topk_numba(query_scores, k=k)))
+
+        for name, call in backends:
+            for k in (-1, -3):
+                with self.assertRaises(ValueError) as context:
+                    call(k)
+                self.assertIn("k must be a non-negative integer", str(context.exception))
+
+    def test_topk_zero_k_returns_empty(self):
+        """k=0 must keep returning an empty selection (existing contract)."""
+        query_scores = np.array([3.0, 1.0, 4.0, 2.0], dtype=np.float32)
+        scores, indices = topk(query_scores, k=0, backend="numpy", sorted=True)
+        self.assertEqual(scores.size, 0)
+        self.assertEqual(indices.size, 0)
 
 
 if __name__ == "__main__":

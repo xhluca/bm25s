@@ -326,7 +326,10 @@ def load_qrels(
             qrels.append((qid, cid, int(score)))
 
     if return_dict:
-        qrels = {qid: {cid: score} for qid, cid, score in qrels}
+        qrels_dict = {}
+        for qid, cid, score in qrels:
+            qrels_dict.setdefault(qid, {})[cid] = score
+        qrels = qrels_dict
 
     return qrels
 

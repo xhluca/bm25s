@@ -660,15 +660,15 @@ class BM25:
             dtype=np.dtype(dtype),
         )
 
-        if weight_mask is not None:
-            # multiply the scores by the weight mask
-            scores *= weight_mask
-
         # if there's a non-occurrence array, we need to add the non-occurrence score
         # back to the scores
         if self.nonoccurrence_array is not None:
             nonoccurrence_scores = self.nonoccurrence_array[query_tokens_ids].sum()
             scores += nonoccurrence_scores
+
+        if weight_mask is not None:
+            # Apply document weights to the complete score, including non-occurrence.
+            scores *= weight_mask
 
         return scores
 
@@ -1197,6 +1197,7 @@ class BM25:
         override_params: dict = None,
         show_progress=True,
         leave_progress=False,
+        verbosity=1,
         **kwargs,
     ):
         """
@@ -1257,6 +1258,9 @@ class BM25:
         leave_progress : bool
             If True, the progress bar will remain after the function completes.
 
+        verbosity : int
+            The verbosity level for logging. Higher values result in more detailed logs.
+
         **kwargs
             Additional arguments are treated as overrides for the parameters.
         """
@@ -1309,7 +1313,7 @@ class BM25:
             corpus_file = save_dir / corpus_name
             if os.path.exists(corpus_file):
                 if mmap is True:
-                    corpus = utils.corpus.JsonlCorpus(corpus_file, show_progress=show_progress, leave_progress=leave_progress)
+                    corpus = utils.corpus.JsonlCorpus(corpus_file, show_progress=show_progress, leave_progress=leave_progress, verbosity=verbosity)
                 else:
                     corpus = []
                     with open(corpus_file, "r", encoding="utf-8") as f:
