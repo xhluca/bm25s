@@ -1085,8 +1085,8 @@ class BM25:
                             f"Error saving document at index {i}: {e}. "
                             "Skipping it may misalign the saved corpus with the index."
                         )
-                        continue
-                    f.write(doc_str + "\n")
+                    else:
+                        f.write(doc_str + "\n")
 
             # also save corpus.mmindex
             mmidx = utils.corpus.find_newline_positions(save_dir / corpus_name, show_progress=show_progress, leave_progress=leave_progress)
