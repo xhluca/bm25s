@@ -773,8 +773,12 @@ class BM25:
         if n_threads == -1:
             n_threads = os.cpu_count()
 
+        # Detect leading-empty Numba ID batches before vocabulary filtering too.
+        type_queries = query_tokens
+        if self.backend == "numba" and isinstance(query_tokens, list):
+            type_queries = [q for q in query_tokens if q != []]
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
-        if is_list_of_list_of_type(query_tokens, type_=int):
+        if is_list_of_list_of_type(type_queries, type_=int):
             if not hasattr(self, "unique_token_ids_set") or self.unique_token_ids_set is None:
                 raise ValueError(
                     "The unique_token_ids_set attribute is not found. Please run the `index` method first, or make sure"
@@ -782,6 +786,10 @@ class BM25:
                 )
             query_tokens_filtered = []
             for query in query_tokens:
+                # Numba scores empty spans directly; keep their batch positions.
+                if self.backend == "numba" and query == []:
+                    query_tokens_filtered.append([])
+                    continue
                 query_filtered = [
                     token_id
                     for token_id in query
@@ -853,11 +861,16 @@ class BM25:
             backend_selection = (
                 "numba" if backend_selection == "auto" else backend_selection
             )
-            # if is list of list of int
-            if is_list_of_list_of_type(query_tokens, type_=int):
+            # Infer the token type from nonempty queries without removing batch rows.
+            type_queries = query_tokens
+            if isinstance(query_tokens, list):
+                type_queries = [q for q in query_tokens if q != []]
+            if is_list_of_list_of_type(type_queries, type_=int):
                 query_tokens_ids = query_tokens
-            elif is_list_of_list_of_type(query_tokens, type_=str):
+            elif is_list_of_list_of_type(type_queries, type_=str):
                 query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
+            elif isinstance(query_tokens, list) and query_tokens and not type_queries:
+                query_tokens_ids = query_tokens
             else:
                 raise ValueError(
                     "The query_tokens must be a list of list of tokens (str for stemmed words, int for token ids matching corpus) or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
