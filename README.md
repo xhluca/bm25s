@@ -86,6 +86,29 @@ pip install "bm25s[full]"
 
 ```
 
+### GPU memory when JAX is installed
+
+If JAX is installed, importing `bm25s` runs a small JAX top-k operation to
+initialize the optional selection backend. On GPU-enabled JAX installations,
+this can trigger GPU memory preallocation even if you later select NumPy for
+retrieval.
+
+To disable preallocation, set the environment variable before importing `bm25s`
+or otherwise initializing JAX:
+
+```python
+import os
+
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+import bm25s
+```
+
+In a notebook where JAX has already initialized, restart the kernel before
+running this cell. This disables preallocation, not GPU use; JAX can still
+allocate GPU memory as needed, with a possible increase in memory fragmentation.
+See the [JAX GPU memory allocation documentation](https://docs.jax.dev/en/latest/gpu_memory_allocation.html)
+for details and alternative settings.
+
 ## Quickstart
 
 Here is a simple example of how to use `bm25s`:
