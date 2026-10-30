@@ -13,6 +13,11 @@ else:
 
 def _topk_numpy(query_scores, k, sorted):
     # https://stackoverflow.com/questions/65038206/how-to-get-indices-of-top-k-values-from-a-numpy-array
+    # An empty corpus yields an empty score array; argpartition/take cannot select
+    # k items from it. Return aligned empty results instead of raising IndexError.
+    if query_scores.size == 0:
+        empty = np.empty(0, dtype=query_scores.dtype)
+        return empty, np.empty(0, dtype=np.int64)
     # np.argpartition is faster than np.argsort, but do not return the values in order
     partitioned_ind = np.argpartition(query_scores, -k)
     # Since lit's a single query, we can take the last k elements
