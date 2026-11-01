@@ -18,6 +18,8 @@ except ImportError:
 
 from . import json_functions
 
+logger = logging.getLogger(__name__)
+
 GH_URL = "https://github.com/xhluca/bm25s/releases/download/data/{}.zip"
 BASE_URL = GH_URL
 
@@ -353,7 +355,7 @@ def evaluate(
         )
 
     if ignore_identical_ids:
-        logging.info(
+        logger.info(
             "For evaluation, we ignore identical query and document ids (default), please explicitly set ``ignore_identical_ids=False`` to ignore this."
         )
         popped = []
@@ -397,8 +399,8 @@ def evaluate(
         precision[f"P@{k}"] = round(precision[f"P@{k}"] / len(scores), 5)
 
     for eval in [ndcg, _map, recall, precision]:
-        logging.info("\n")
+        logger.info("\n")
         for k in eval.keys():
-            logging.info("{}: {:.4f}".format(k, eval[k]))
+            logger.info("{}: {:.4f}".format(k, eval[k]))
 
     return ndcg, _map, recall, precision

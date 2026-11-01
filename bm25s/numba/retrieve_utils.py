@@ -8,6 +8,8 @@ from .. import utils
 from ..scoring import _compute_relevance_from_scores_jit_ready
 from .selection import _numba_sorted_top_k
 
+logger = logging.getLogger(__name__)
+
 _compute_relevance_from_scores_jit_ready = njit()(_compute_relevance_from_scores_jit_ready)
 
 def _retrieve_internal_jitted(
@@ -90,7 +92,7 @@ def _retrieve_numba_functional(
 
     if chunksize != None:
         # warn the user that the chunksize parameter is ignored
-        logging.warning(
+        logger.warning(
             "The `chunksize` parameter is ignored in the `retrieve` function when using the `numba` backend."
             "The function will automatically determine the best chunksize."
         )
