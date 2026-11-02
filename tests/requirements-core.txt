@@ -1,1 +1,3 @@
--e .[full]
+# Install the extras exercised by core, Numba, and high-level tests.
+# Evaluation and MCP dependencies are not needed by these suites.
+-e .[core,selection,indexing,hf,cli]
