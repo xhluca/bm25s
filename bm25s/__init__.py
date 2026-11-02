@@ -354,7 +354,10 @@ class BM25:
                 f"Invalid csc_backend value: {self.csc_backend}. Choose from 'scipy', 'numpy'."
             )
 
-        avg_doc_len = np.array([len(doc_ids) for doc_ids in corpus_token_ids]).mean()
+        # An empty corpus (no documents) has no mean document length; default to 0
+        # instead of letting numpy emit a RuntimeWarning and produce NaN.
+        _doc_lengths = np.array([len(doc_ids) for doc_ids in corpus_token_ids])
+        avg_doc_len = _doc_lengths.mean() if _doc_lengths.size > 0 else 0.0
         n_docs = len(corpus_token_ids)
         n_vocab = len(unique_token_ids)
 
@@ -443,6 +446,14 @@ class BM25:
         """
         Low-level function to build the BM25 index from tokens, used by the `index` method.
         You can override this function if you want to build the index in a different way.
+
+        The signature ``(corpus_tokens, show_progress, leave_progress)`` is part of the
+        override contract: ``index`` calls it with only these existing keywords and must
+        not pass ``create_empty_token``, so subclasses that keep the old signature keep
+        working. The empty-token policy is handed through the private
+        ``_create_empty_token`` attribute (set/restored by ``index``) instead of a
+        keyword argument; calling this low-level method directly leaves the policy
+        unset, i.e. the historical no-seeding default.
         """
         unique_tokens = get_unique_tokens(
             corpus_tokens,
@@ -450,6 +461,15 @@ class BM25:
             leave_progress=leave_progress,
             desc="BM25S Create Vocab",
         )
+        # Reserve the seeded empty token as a real (zero-score) vocabulary column up
+        # front. Otherwise a token-less corpus yields an empty `unique_tokens`, the
+        # score matrix is built with zero columns, and the later
+        # `vocab_dict[""] = 0` seeding leaves an id (0) with no matching column --
+        # so even an ordinary query trips the "max token ID higher than the number
+        # of tokens" guard. Including it here keeps n_vocab, the idf array and the
+        # BM25L/BM25+ nonoccurrence array all consistently one column wide.
+        if getattr(self, "_create_empty_token", False) and "" not in unique_tokens:
+            unique_tokens = list(unique_tokens) + [""]
         vocab_dict = {token: i for i, token in enumerate(unique_tokens)}
         unique_token_ids = [vocab_dict[token] for token in unique_tokens]
 
@@ -518,9 +538,25 @@ class BM25:
 
         if inferred_corpus_obj == "tokens":
             logger.debug(msg="Building index from tokens")
-            scores, vocab_dict = self.build_index_from_tokens(
-                corpus, leave_progress=leave_progress, show_progress=show_progress
-            )
+            # Hand the empty-token policy to the overridable method through a private
+            # attribute instead of a keyword: build_index_from_tokens keeps its old
+            # (corpus_tokens, show_progress, leave_progress) signature so existing
+            # subclasses overriding it are not broken by an unexpected kwarg. Save and
+            # restore the prior value (rather than resetting to False) so a nested or
+            # reentrant index() call cannot overwrite an outer caller's policy, and
+            # clear the attribute when it was unset before this call.
+            _sentinel = object()
+            prev_policy = getattr(self, "_create_empty_token", _sentinel)
+            self._create_empty_token = create_empty_token
+            try:
+                scores, vocab_dict = self.build_index_from_tokens(
+                    corpus, leave_progress=leave_progress, show_progress=show_progress,
+                )
+            finally:
+                if prev_policy is _sentinel:
+                    self.__dict__.pop("_create_empty_token", None)
+                else:
+                    self._create_empty_token = prev_policy
         else:
             if inferred_corpus_obj == "tuple":
                 logger.debug(msg="Building index from IDs")
@@ -551,6 +587,20 @@ class BM25:
                     "Internal error: Found an invalid corpus object, indicating `_inferred_corpus_object` is not working correctly."
                 )
 
+            # For tuple/object inputs the empty token must be reserved BEFORE the
+            # matrix is built: seeding `vocab_dict[""]` afterwards only adds a
+            # vocabulary id with no matching score-matrix column, so an ordinary
+            # query trips the "max token ID higher than the number of tokens" guard
+            # (and the native numba path raises IndexError under bounds checking).
+            # Seeding up front puts the zero-score column in n_vocab, the idf array
+            # and the BM25L/BM25+ nonoccurrence array consistently.
+            if (
+                create_empty_token
+                and inferred_corpus_obj in ("tuple", "object")
+                and "" not in vocab_dict
+            ):
+                vocab_dict[""] = (max(vocab_dict.values()) + 1) if vocab_dict else 0
+
             unique_token_ids = list(vocab_dict.values())
             scores = self.build_index_from_ids(
                 unique_token_ids=unique_token_ids,
@@ -561,7 +611,10 @@ class BM25:
 
         if create_empty_token:
             if inferred_corpus_obj != "token_ids" and "" not in vocab_dict:
-                vocab_dict[""] = max(vocab_dict.values()) + 1
+                # An empty corpus (no documents, or only token-less documents)
+                # yields an empty vocabulary, where max() raises
+                # "max() iterable argument is empty". Seed the empty token at id 0.
+                vocab_dict[""] = (max(vocab_dict.values()) + 1) if vocab_dict else 0
 
         self.scores = scores
         self.vocab_dict = vocab_dict
