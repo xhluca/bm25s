@@ -140,6 +140,35 @@ def _is_tuple_of_list_of_tokens(obj):
     return True
 
 
+def _infer_numba_query_batch_type(query_tokens):
+    """
+    Infer the token type of a Numba query batch while allowing empty rows.
+
+    Returns int or str when every row is a list and every token in the batch has
+    that type, "empty" when every row is an empty list, and None otherwise
+    (empty batches, non-list rows such as numpy arrays, or mixed token types).
+    """
+    if not isinstance(query_tokens, list) or len(query_tokens) == 0:
+        return None
+
+    batch_type = None
+    for query in query_tokens:
+        if not isinstance(query, list):
+            return None
+        for token in query:
+            if isinstance(token, int):
+                token_type = int
+            elif isinstance(token, str):
+                token_type = str
+            else:
+                return None
+            if batch_type is not None and token_type is not batch_type:
+                return None
+            batch_type = token_type
+
+    return "empty" if batch_type is None else batch_type
+
+
 class BM25:
     def __init__(
         self,
@@ -773,12 +802,13 @@ class BM25:
         if n_threads == -1:
             n_threads = os.cpu_count()
 
-        # Detect leading-empty Numba ID batches before vocabulary filtering too.
-        type_queries = query_tokens
-        if self.backend == "numba" and isinstance(query_tokens, list):
-            type_queries = [q for q in query_tokens if q != []]
+        # Numba validates the whole batch so empty rows can appear at any position.
+        if self.backend == "numba":
+            is_id_batch = _infer_numba_query_batch_type(query_tokens) is int
+        else:
+            is_id_batch = is_list_of_list_of_type(query_tokens, type_=int)
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
-        if is_list_of_list_of_type(type_queries, type_=int):
+        if is_id_batch:
             if not hasattr(self, "unique_token_ids_set") or self.unique_token_ids_set is None:
                 raise ValueError(
                     "The unique_token_ids_set attribute is not found. Please run the `index` method first, or make sure"
@@ -787,7 +817,7 @@ class BM25:
             query_tokens_filtered = []
             for query in query_tokens:
                 # Numba scores empty spans directly; keep their batch positions.
-                if self.backend == "numba" and query == []:
+                if self.backend == "numba" and len(query) == 0:
                     query_tokens_filtered.append([])
                     continue
                 query_filtered = [
@@ -861,20 +891,29 @@ class BM25:
             backend_selection = (
                 "numba" if backend_selection == "auto" else backend_selection
             )
-            # Infer the token type from nonempty queries without removing batch rows.
-            type_queries = query_tokens
-            if isinstance(query_tokens, list):
-                type_queries = [q for q in query_tokens if q != []]
-            if is_list_of_list_of_type(type_queries, type_=int):
+            # Infer the token type from the whole batch without removing empty rows.
+            batch_type = _infer_numba_query_batch_type(query_tokens)
+            if batch_type is int or batch_type == "empty":
                 query_tokens_ids = query_tokens
-            elif is_list_of_list_of_type(type_queries, type_=str):
+            elif batch_type is str:
                 query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
-            elif isinstance(query_tokens, list) and query_tokens and not type_queries:
-                query_tokens_ids = query_tokens
             else:
                 raise ValueError(
                     "The query_tokens must be a list of list of tokens (str for stemmed words, int for token ids matching corpus) or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
                 )
+
+            # Numba reads the CSC arrays without bounds checks. Reject IDs outside
+            # the index (such as an empty-token fallback added after indexing),
+            # matching the numpy backend's check in get_scores_from_ids.
+            num_index_tokens = len(self.scores["indptr"]) - 1
+            for query in query_tokens_ids:
+                if len(query) > 0 and (
+                    min(query) < 0 or max(query) >= num_index_tokens
+                ):
+                    raise ValueError(
+                        f"The query contains a token ID outside the index (valid IDs are 0 to {num_index_tokens - 1}). "
+                        "This likely means that the query contains tokens that are not in the index."
+                    )
 
             res = _retrieve_numba_functional(
                 query_tokens_ids=query_tokens_ids,

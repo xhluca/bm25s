@@ -68,5 +68,64 @@ class TestEmptyQueryBatches(unittest.TestCase):
                     self.assert_batch(loaded, [[], ['cat'], ['dog']])
 
 
+class TestDefaultFlowQueryValidation(unittest.TestCase):
+    """Default tokenize + index flow, where the empty token is added after the CSC index."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.model = bm25s.BM25(backend='numba', auto_compile=False)
+        cls.model.index(
+            bm25s.tokenize(['cat purrs', 'dog barks', 'fish swims'], show_progress=False),
+            show_progress=False,
+        )
+
+    def retrieve(self, queries):
+        return self.model.retrieve(queries, k=3, show_progress=False, n_threads=1)
+
+    def test_empty_token_fallback_is_outside_default_index(self):
+        # Guards the precondition the regression tests below depend on.
+        self.assertEqual(self.model.vocab_dict[''], len(self.model.scores['indptr']) - 1)
+
+    def test_out_of_index_ids_raise_with_and_without_empty_rows(self):
+        empty_id = self.model.vocab_dict['']
+        for queries in (
+            [[999]], [[], [999]], [[999], []],
+            [[], [empty_id]], [[empty_id], []], [[], [0], [999]],
+        ):
+            with self.subTest(queries=queries):
+                with self.assertRaisesRegex(ValueError, 'outside the index'):
+                    self.retrieve(queries)
+
+    def test_in_index_rows_keep_batch_positions(self):
+        cat, dog = self.model.vocab_dict['cat'], self.model.vocab_dict['dog']
+        for queries in ([[], [cat]], [[cat], []], [[], [dog, cat]], [[], []], [[], ['cat']], [['dog'], [], ['cat']]):
+            with self.subTest(queries=queries):
+                result = self.retrieve(queries)
+                self.assertEqual(result.scores.shape, (len(queries), 3))
+                for row, query in enumerate(queries):
+                    if query:
+                        expected = self.retrieve([query])
+                        np.testing.assert_array_equal(result.scores[row], expected.scores[0])
+                        np.testing.assert_array_equal(result.documents[row], expected.documents[0])
+                    else:
+                        np.testing.assert_array_equal(result.scores[row], 0)
+
+    def test_mixed_and_non_list_batches_raise_documented_error(self):
+        for queries in (
+            [[], ['cat'], [0]],
+            [[0], ['cat']],
+            [[], [0, 'cat']],
+            [[], ['cat', 0]],
+            [['cat'], [], [0]],
+            [[], np.array([], dtype=int)],
+            [np.array([], dtype=int), [0]],
+            [np.array([0]), np.array([2])],
+            [],
+        ):
+            with self.subTest(queries=queries):
+                with self.assertRaisesRegex(ValueError, 'list of list of tokens'):
+                    self.retrieve(queries)
+
+
 if __name__ == '__main__':
     unittest.main()
