@@ -1057,7 +1057,7 @@ class BM25:
             with open(save_dir / corpus_name, "wt", encoding="utf-8") as f:
                 # if it's not an iterable, we skip
                 if not isinstance(corpus, Iterable):
-                    logging.warning(
+                    logger.warning(
                         "The corpus is not an iterable. Skipping saving the corpus."
                     )
 
@@ -1067,7 +1067,7 @@ class BM25:
                     elif isinstance(doc, (dict, list, tuple)):
                         doc = doc
                     else:
-                        logging.warning(
+                        logger.warning(
                             f"Document at index {i} is not a string, dictionary, list or tuple. Skipping."
                         )
                         continue
@@ -1081,7 +1081,7 @@ class BM25:
                                 f"({type(e).__name__}: {e}). "
                                 "Skipping it would misalign the saved corpus with the index."
                             ) from e
-                        logging.warning(
+                        logger.warning(
                             f"Error saving document at index {i}: {e}. "
                             "Skipping it may misalign the saved corpus with the index."
                         )
