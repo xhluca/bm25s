@@ -84,15 +84,17 @@ def main(data_dir="datasets", dataset="scifact"):
     # e.g. using the ids directly
     results, scores = retriever.retrieve(query_ids, k=3)
 
-    # or passing the strings
-    results, scores = retriever.retrieve(query_strs, k=3)
-
     # or passing the Tokenized namedtuple
     results, scores = retriever.retrieve(res, k=3)
-    
+
     # or passing a tuple of ids and vocab dict
     vocab_dict = tokenizer.get_vocab_dict()
     results, scores = retriever.retrieve((query_ids, vocab_dict), k=3)
+
+    # strings can only be matched against an index built from strings
+    string_retriever = bm25s.BM25()
+    string_retriever.index(tokenizer.decode(corpus_tokenized), leave_progress=False)
+    results, scores = string_retriever.retrieve(query_strs, k=3)
 
     # If you want, you can save the vocab and stopwords, it can be the same dir as your index
     your_index_dir = tempfile.mkdtemp()

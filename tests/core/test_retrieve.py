@@ -6,6 +6,7 @@ import tempfile
 
 import numpy as np
 import bm25s
+from bm25s.tokenization import Tokenizer
 import Stemmer  # optional: for stemming
 
 class TestBM25SLoadingSaving(unittest.TestCase):
@@ -188,3 +189,51 @@ class TestBM25SLoadingSaving(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         pass
+
+
+class TestRetrieveFromTokenIdsIndex(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        corpus = [
+            "a cat is a feline and likes to purr",
+            "a dog is the human's best friend and loves to play",
+            "a bird is a beautiful animal that can fly",
+            "a fish is a creature that lives in water and swims",
+        ]
+        cls.tokenizer = Tokenizer(stopwords="en", stemmer=Stemmer.Stemmer("english"))
+        corpus_ids = cls.tokenizer.tokenize(corpus, show_progress=False)
+        cls.query_ids = cls.tokenizer.tokenize(
+            ["does the cat purr"], update_vocab=False, show_progress=False
+        )
+
+        cls.retriever = bm25s.BM25()
+        cls.retriever.index(corpus_ids, show_progress=False)
+
+        string_retriever = bm25s.BM25()
+        string_retriever.index(cls.tokenizer.decode(corpus_ids), show_progress=False)
+        cls.expected = string_retriever.retrieve(
+            cls.tokenizer.decode(cls.query_ids), k=1, show_progress=False
+        )
+
+    def test_retrieve_each_id_query_format(self):
+        query_formats = {
+            "ids": self.query_ids,
+            "Tokenized": self.tokenizer.to_tokenized_tuple(self.query_ids),
+            "(ids, vocab)": (self.query_ids, self.tokenizer.get_vocab_dict()),
+            "(ids, empty vocab)": (self.query_ids, {}),
+        }
+        for name, query in query_formats.items():
+            with self.subTest(query_format=name):
+                results = self.retriever.retrieve(query, k=1, show_progress=False)
+                np.testing.assert_array_equal(results.documents, self.expected.documents)
+                np.testing.assert_allclose(results.scores, self.expected.scores, rtol=1e-6)
+
+    def test_retrieve_with_strings_raises(self):
+        with self.assertRaises(ValueError):
+            self.retriever.retrieve(
+                self.tokenizer.decode(self.query_ids), k=2, show_progress=False
+            )
+
+    def test_get_scores_with_strings_raises(self):
+        with self.assertRaises(ValueError):
+            self.retriever.get_scores(self.tokenizer.decode(self.query_ids)[0])
