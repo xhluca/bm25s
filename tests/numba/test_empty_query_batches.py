@@ -96,6 +96,16 @@ class TestDefaultFlowQueryValidation(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'outside the index'):
                     self.retrieve(queries)
 
+    def test_out_of_index_error_keeps_numba_thread_count(self):
+        from numba import config, get_num_threads
+
+        if config.NUMBA_NUM_THREADS < 2:
+            self.skipTest('needs at least two numba threads')
+        before = get_num_threads()
+        with self.assertRaisesRegex(ValueError, 'outside the index'):
+            self.model.retrieve([[], [999]], k=3, show_progress=False, n_threads=2)
+        self.assertEqual(get_num_threads(), before)
+
     def test_in_index_rows_keep_batch_positions(self):
         cat, dog = self.model.vocab_dict['cat'], self.model.vocab_dict['dog']
         for queries in ([[], [cat]], [[cat], []], [[], [dog, cat]], [[], []], [[], ['cat']], [['dog'], [], ['cat']]):

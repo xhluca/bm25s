@@ -803,8 +803,11 @@ class BM25:
             n_threads = os.cpu_count()
 
         # Numba validates the whole batch so empty rows can appear at any position.
+        numba_batch_type = numba_checked_tokens = None
         if self.backend == "numba":
-            is_id_batch = _infer_numba_query_batch_type(query_tokens) is int
+            numba_batch_type = _infer_numba_query_batch_type(query_tokens)
+            numba_checked_tokens = query_tokens
+            is_id_batch = numba_batch_type is int
         else:
             is_id_batch = is_list_of_list_of_type(query_tokens, type_=int)
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
@@ -892,7 +895,13 @@ class BM25:
                 "numba" if backend_selection == "auto" else backend_selection
             )
             # Infer the token type from the whole batch without removing empty rows.
-            batch_type = _infer_numba_query_batch_type(query_tokens)
+            # An int batch was already validated and filtered above.
+            if is_id_batch:
+                batch_type = int
+            elif query_tokens is numba_checked_tokens:
+                batch_type = numba_batch_type
+            else:
+                batch_type = _infer_numba_query_batch_type(query_tokens)
             if batch_type is int or batch_type == "empty":
                 query_tokens_ids = query_tokens
             elif batch_type is str:
@@ -901,19 +910,6 @@ class BM25:
                 raise ValueError(
                     "The query_tokens must be a list of list of tokens (str for stemmed words, int for token ids matching corpus) or a tuple of two lists: the first list is the list of unique token IDs, and the second list is the list of token IDs for each document."
                 )
-
-            # Numba reads the CSC arrays without bounds checks. Reject IDs outside
-            # the index (such as an empty-token fallback added after indexing),
-            # matching the numpy backend's check in get_scores_from_ids.
-            num_index_tokens = len(self.scores["indptr"]) - 1
-            for query in query_tokens_ids:
-                if len(query) > 0 and (
-                    min(query) < 0 or max(query) >= num_index_tokens
-                ):
-                    raise ValueError(
-                        f"The query contains a token ID outside the index (valid IDs are 0 to {num_index_tokens - 1}). "
-                        "This likely means that the query contains tokens that are not in the index."
-                    )
 
             res = _retrieve_numba_functional(
                 query_tokens_ids=query_tokens_ids,
