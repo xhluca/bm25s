@@ -140,6 +140,35 @@ def _is_tuple_of_list_of_tokens(obj):
     return True
 
 
+def _infer_numba_query_batch_type(query_tokens):
+    """
+    Infer the token type of a Numba query batch while allowing empty rows.
+
+    Returns int or str when every row is a list and every token in the batch has
+    that type, "empty" when every row is an empty list, and None otherwise
+    (empty batches, non-list rows such as numpy arrays, or mixed token types).
+    """
+    if not isinstance(query_tokens, list) or len(query_tokens) == 0:
+        return None
+
+    batch_type = None
+    for query in query_tokens:
+        if not isinstance(query, list):
+            return None
+        for token in query:
+            if isinstance(token, int):
+                token_type = int
+            elif isinstance(token, str):
+                token_type = str
+            else:
+                return None
+            if batch_type is not None and token_type is not batch_type:
+                return None
+            batch_type = token_type
+
+    return "empty" if batch_type is None else batch_type
+
+
 class BM25:
     def __init__(
         self,
@@ -773,8 +802,16 @@ class BM25:
         if n_threads == -1:
             n_threads = os.cpu_count()
 
+        # Numba validates the whole batch so empty rows can appear at any position.
+        numba_batch_type = numba_checked_tokens = None
+        if self.backend == "numba":
+            numba_batch_type = _infer_numba_query_batch_type(query_tokens)
+            numba_checked_tokens = query_tokens
+            is_id_batch = numba_batch_type is int
+        else:
+            is_id_batch = is_list_of_list_of_type(query_tokens, type_=int)
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
-        if is_list_of_list_of_type(query_tokens, type_=int):
+        if is_id_batch:
             if not hasattr(self, "unique_token_ids_set") or self.unique_token_ids_set is None:
                 raise ValueError(
                     "The unique_token_ids_set attribute is not found. Please run the `index` method first, or make sure"
@@ -782,6 +819,10 @@ class BM25:
                 )
             query_tokens_filtered = []
             for query in query_tokens:
+                # Numba scores empty spans directly; keep their batch positions.
+                if self.backend == "numba" and len(query) == 0:
+                    query_tokens_filtered.append([])
+                    continue
                 query_filtered = [
                     token_id
                     for token_id in query
@@ -853,10 +894,17 @@ class BM25:
             backend_selection = (
                 "numba" if backend_selection == "auto" else backend_selection
             )
-            # if is list of list of int
-            if is_list_of_list_of_type(query_tokens, type_=int):
+            # Infer the token type from the whole batch without removing empty rows.
+            # An int batch was already validated and filtered above.
+            if is_id_batch:
+                batch_type = int
+            elif query_tokens is numba_checked_tokens:
+                batch_type = numba_batch_type
+            else:
+                batch_type = _infer_numba_query_batch_type(query_tokens)
+            if batch_type is int or batch_type == "empty":
                 query_tokens_ids = query_tokens
-            elif is_list_of_list_of_type(query_tokens, type_=str):
+            elif batch_type is str:
                 query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
             else:
                 raise ValueError(
