@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 from functools import partial
+from itertools import chain, repeat
 
 import os
 import logging
@@ -151,22 +152,30 @@ def _infer_numba_query_batch_type(query_tokens):
     if not isinstance(query_tokens, list) or len(query_tokens) == 0:
         return None
 
-    batch_type = None
-    for query in query_tokens:
-        if not isinstance(query, list):
+    # A single query in a plain list skips the row map and chain, which dominate
+    # short calls. List subclasses keep the iterator path below.
+    if type(query_tokens) is list and len(query_tokens) == 1:
+        if not isinstance(query_tokens[0], list):
             return None
-        for token in query:
-            if isinstance(token, int):
-                token_type = int
-            elif isinstance(token, str):
-                token_type = str
-            else:
-                return None
-            if batch_type is not None and token_type is not batch_type:
-                return None
-            batch_type = token_type
+        tokens = iter(query_tokens[0])
+    elif all(map(isinstance, query_tokens, repeat(list))):
+        tokens = chain.from_iterable(query_tokens)
+    else:
+        return None
 
-    return "empty" if batch_type is None else batch_type
+    # The first token fixes the batch type; the remaining tokens are checked
+    # with isinstance in C-level iteration rather than a Python loop.
+    for first_token in tokens:
+        break
+    else:
+        return "empty"
+    if isinstance(first_token, int):
+        batch_type = int
+    elif isinstance(first_token, str):
+        batch_type = str
+    else:
+        return None
+    return batch_type if all(map(isinstance, tokens, repeat(batch_type))) else None
 
 
 class BM25:
@@ -819,16 +828,16 @@ class BM25:
                 )
             query_tokens_filtered = []
             for query in query_tokens:
-                # Numba scores empty spans directly; keep their batch positions.
-                if self.backend == "numba" and len(query) == 0:
-                    query_tokens_filtered.append([])
-                    continue
                 query_filtered = [
                     token_id
                     for token_id in query
                     if token_id in self.unique_token_ids_set
                 ]
                 if len(query_filtered) == 0:
+                    # Numba scores empty spans directly; keep their batch positions.
+                    if self.backend == "numba" and len(query) == 0:
+                        query_tokens_filtered.append(query_filtered)
+                        continue
                     if "" not in self.vocab_dict:
                         raise ValueError(
                             "The query does not contain any tokens that are in the vocabulary. "

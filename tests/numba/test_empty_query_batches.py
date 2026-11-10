@@ -136,6 +136,57 @@ class TestDefaultFlowQueryValidation(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'list of list of tokens'):
                     self.retrieve(queries)
 
+    def test_token_and_row_subclasses_match_plain_queries(self):
+        # Batch validation uses isinstance, so subclasses are accepted even when
+        # their metaclass is unhashable, and type equality tricks are not trusted.
+        class Row(list):
+            pass
+
+        class UnhashableMeta(type):
+            def __eq__(cls, other):
+                return cls is other
+
+        class UnhashableStr(str, metaclass=UnhashableMeta):
+            pass
+
+        class UnhashableRow(list, metaclass=UnhashableMeta):
+            pass
+
+        class EqualToAnyTypeMeta(type):
+            def __eq__(cls, other):
+                return True
+
+            def __hash__(cls):
+                return hash(int)
+
+        class NotAToken(metaclass=EqualToAnyTypeMeta):
+            pass
+
+        cat, dog = self.model.vocab_dict['cat'], self.model.vocab_dict['dog']
+        for queries, plain in (
+            ([[], [np.str_('cat')]], [[], ['cat']]),
+            ([Row(['dog']), [], ['cat']], [['dog'], [], ['cat']]),
+            ([[], Row([cat])], [[], [cat]]),
+            ([[True], [], [dog]], [[1], [], [dog]]),
+            ([[], [UnhashableStr('cat')]], [[], ['cat']]),
+            ([UnhashableRow(['dog']), [], ['cat']], [['dog'], [], ['cat']]),
+        ):
+            with self.subTest(queries=queries):
+                result = self.retrieve(queries)
+                expected = self.retrieve(plain)
+                np.testing.assert_array_equal(result.documents, expected.documents)
+                np.testing.assert_array_equal(result.scores, expected.scores)
+        for queries in (
+            [[np.int64(cat)]],
+            [[], [np.int64(cat)]],
+            [Row([cat]), ['dog']],
+            [[NotAToken()]],
+            [[], [cat, NotAToken()]],
+        ):
+            with self.subTest(queries=queries):
+                with self.assertRaisesRegex(ValueError, 'list of list of tokens'):
+                    self.retrieve(queries)
+
 
 if __name__ == '__main__':
     unittest.main()
