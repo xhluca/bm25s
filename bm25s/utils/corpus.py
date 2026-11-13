@@ -4,6 +4,8 @@ import os
 
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 try:
     import orjson as json
 except ImportError:
@@ -139,7 +141,7 @@ class JsonlCorpus:
         if os.path.exists(change_extension(path, ".mmindex.json")):
             self.mmindex = load_mmindex(path, encoding=self.encoding)
         else:
-            logging.info("Creating index file for jsonl corpus")
+            logger.info("Creating index file for jsonl corpus")
             mmindex = find_newline_positions(
                 path, show_progress=show_progress, leave_progress=leave_progress, encoding=self.encoding
             )
@@ -204,7 +206,7 @@ class JsonlCorpus:
             del self.mmap_obj
             self.mmap_obj = None
         if self.verbosity >= 1:
-            logging.info("Closed file and mmap objects")
+            logger.info("Closed file and mmap objects")
     
     def load(self):
         """
@@ -232,7 +234,7 @@ class JsonlCorpus:
         else:
             self.mmap_obj = mmap.mmap(self.file_obj.fileno(), 0, access=mmap.ACCESS_READ)
         if self.verbosity >= 1:
-            logging.info("Opened file and mmap objects")
+            logger.info("Opened file and mmap objects")
     
     def __del__(self):
         self.close()
