@@ -155,6 +155,9 @@ class JsonlCorpus:
         return len(self.mmindex)
 
     def __getitem__(self, index):
+        if isinstance(index, np.integer):
+            index = int(index)
+
         # An empty corpus has no lines: integer indexing is out of range, mirroring a
         # regular empty list. Slice/list/ndarray indexing return an empty result.
         if len(self.mmindex) == 0 and isinstance(index, int):

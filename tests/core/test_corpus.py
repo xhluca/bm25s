@@ -185,6 +185,26 @@ class TestJsonlCorpus(unittest.TestCase):
         
         corpus.close()
 
+    def test_jsonl_corpus_getitem_numpy_integer(self):
+        corpus = JsonlCorpus(self.test_file, show_progress=False, verbosity=0)
+        try:
+            for dtype in (np.int32, np.int64, np.uint32, np.uint64):
+                with self.subTest(dtype=dtype):
+                    self.assertEqual(corpus[dtype(2)], self.test_data[2])
+                    self.assertEqual(
+                        corpus[[dtype(0), dtype(3)]],
+                        [self.test_data[0], self.test_data[3]],
+                    )
+                    with self.assertRaises(IndexError):
+                        corpus[dtype(len(self.test_data))]
+            self.assertEqual(corpus[np.int64(-1)], self.test_data[-1])
+            with self.assertRaises(IndexError):
+                corpus[np.int64(-len(self.test_data) - 1)]
+            with self.assertRaises(TypeError):
+                corpus[np.float64(1.0)]
+        finally:
+            corpus.close()
+
     def test_jsonl_corpus_getitem_slice(self):
         """Test JsonlCorpus __getitem__ with slice"""
         corpus = JsonlCorpus(self.test_file, show_progress=False)
@@ -328,6 +348,16 @@ class TestJsonlCorpusEmptyFile(unittest.TestCase):
         with self.assertRaises(IndexError):
             _ = corpus[0]
         corpus.close()
+
+    def test_empty_file_numpy_integer_index_raises_index_error(self):
+        corpus = JsonlCorpus(self.empty_file, show_progress=False, verbosity=0)
+        try:
+            for index in (np.int32(0), np.int64(-1), np.uint64(0)):
+                with self.subTest(index=index):
+                    with self.assertRaises(IndexError):
+                        corpus[index]
+        finally:
+            corpus.close()
 
     def test_empty_file_slice_is_empty(self):
         corpus = JsonlCorpus(self.empty_file, show_progress=False, save_index=False)
