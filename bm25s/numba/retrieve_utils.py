@@ -109,6 +109,25 @@ def _retrieve_numba_functional(
     elif n_threads == 0:
         n_threads = 1
 
+    # convert query_tokens_ids from list of list to a flat 1-d np.ndarray with
+    # pointers to the start of each query to be used to find the boundaries of each query
+    query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=int_dtype)
+    query_tokens_ids_flat = np.concatenate(query_tokens_ids)
+    # The jitted kernels index the CSC arrays without bounds checks. Reject IDs
+    # outside the index (such as an empty-token fallback added after indexing),
+    # matching the numpy backend's check in get_scores_from_ids. This runs before
+    # the numba thread count is changed, so an error leaves it untouched.
+    num_index_tokens = len(scores["indptr"]) - 1
+    if query_tokens_ids_flat.size > 0 and (
+        query_tokens_ids_flat.min() < 0
+        or query_tokens_ids_flat.max() >= num_index_tokens
+    ):
+        raise ValueError(
+            f"The query contains a token ID outside the index (valid IDs are 0 to {num_index_tokens - 1}). "
+            "This likely means that the query contains tokens that are not in the index."
+        )
+    query_tokens_ids_flat = query_tokens_ids_flat.astype(int_dtype)
+
     og_n_threads: int | None = None
     # Use serial execution when n_threads is one, so we don't need to call into numba.
     # This also makes n_threads = 1 thread-safe.
@@ -119,11 +138,6 @@ def _retrieve_numba_functional(
 
     # use serial execution when n_threads is one, since we didn't set set_num_threads.
     retrieve_internal = _retrieve_internal_jitted_serial if n_threads == 1 else _retrieve_internal_jitted_parallel
-
-    # convert query_tokens_ids from list of list to a flat 1-d np.ndarray with
-    # pointers to the start of each query to be used to find the boundaries of each query
-    query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=int_dtype)
-    query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(int_dtype)
 
     retrieved_scores, retrieved_indices = retrieve_internal(
         query_pointers=query_pointers,

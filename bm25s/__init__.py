@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 from functools import partial
+from itertools import chain, repeat
 
 import os
 import logging
@@ -138,6 +139,43 @@ def _is_tuple_of_list_of_tokens(obj):
         return False
 
     return True
+
+
+def _infer_numba_query_batch_type(query_tokens):
+    """
+    Infer the token type of a Numba query batch while allowing empty rows.
+
+    Returns int or str when every row is a list and every token in the batch has
+    that type, "empty" when every row is an empty list, and None otherwise
+    (empty batches, non-list rows such as numpy arrays, or mixed token types).
+    """
+    if not isinstance(query_tokens, list) or len(query_tokens) == 0:
+        return None
+
+    # A single query in a plain list skips the row map and chain, which dominate
+    # short calls. List subclasses keep the iterator path below.
+    if type(query_tokens) is list and len(query_tokens) == 1:
+        if not isinstance(query_tokens[0], list):
+            return None
+        tokens = iter(query_tokens[0])
+    elif all(map(isinstance, query_tokens, repeat(list))):
+        tokens = chain.from_iterable(query_tokens)
+    else:
+        return None
+
+    # The first token fixes the batch type; the remaining tokens are checked
+    # with isinstance in C-level iteration rather than a Python loop.
+    for first_token in tokens:
+        break
+    else:
+        return "empty"
+    if isinstance(first_token, int):
+        batch_type = int
+    elif isinstance(first_token, str):
+        batch_type = str
+    else:
+        return None
+    return batch_type if all(map(isinstance, tokens, repeat(batch_type))) else None
 
 
 class BM25:
@@ -773,8 +811,16 @@ class BM25:
         if n_threads == -1:
             n_threads = os.cpu_count()
 
+        # Numba validates the whole batch so empty rows can appear at any position.
+        numba_batch_type = numba_checked_tokens = None
+        if self.backend == "numba":
+            numba_batch_type = _infer_numba_query_batch_type(query_tokens)
+            numba_checked_tokens = query_tokens
+            is_id_batch = numba_batch_type is int
+        else:
+            is_id_batch = is_list_of_list_of_type(query_tokens, type_=int)
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
-        if is_list_of_list_of_type(query_tokens, type_=int):
+        if is_id_batch:
             if not hasattr(self, "unique_token_ids_set") or self.unique_token_ids_set is None:
                 raise ValueError(
                     "The unique_token_ids_set attribute is not found. Please run the `index` method first, or make sure"
@@ -788,6 +834,10 @@ class BM25:
                     if token_id in self.unique_token_ids_set
                 ]
                 if len(query_filtered) == 0:
+                    # Numba scores empty spans directly; keep their batch positions.
+                    if self.backend == "numba" and len(query) == 0:
+                        query_tokens_filtered.append(query_filtered)
+                        continue
                     if "" not in self.vocab_dict:
                         raise ValueError(
                             "The query does not contain any tokens that are in the vocabulary. "
@@ -853,10 +903,17 @@ class BM25:
             backend_selection = (
                 "numba" if backend_selection == "auto" else backend_selection
             )
-            # if is list of list of int
-            if is_list_of_list_of_type(query_tokens, type_=int):
+            # Infer the token type from the whole batch without removing empty rows.
+            # An int batch was already validated and filtered above.
+            if is_id_batch:
+                batch_type = int
+            elif query_tokens is numba_checked_tokens:
+                batch_type = numba_batch_type
+            else:
+                batch_type = _infer_numba_query_batch_type(query_tokens)
+            if batch_type is int or batch_type == "empty":
                 query_tokens_ids = query_tokens
-            elif is_list_of_list_of_type(query_tokens, type_=str):
+            elif batch_type is str:
                 query_tokens_ids = [self.get_tokens_ids(q) for q in query_tokens]
             else:
                 raise ValueError(
