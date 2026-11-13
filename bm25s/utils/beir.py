@@ -137,6 +137,7 @@ def download_dataset(
     import urllib.request
     import urllib.error
     import zipfile
+    from tempfile import TemporaryDirectory
     from pathlib import Path
     from tqdm.auto import tqdm
 
@@ -149,26 +150,21 @@ def download_dataset(
     save_zip_path.parent.mkdir(parents=True, exist_ok=True)
 
     def download_file(src_url, dst_path, desc):
-        pbar = tqdm(
-            unit="B",
-            unit_scale=True,
-            desc=desc,
-            leave=leave_progress,
-            disable=not show_progress,
-        )
-        with open(dst_path, "wb") as f:
-            response = urllib.request.urlopen(src_url)
-            total_size = int(response.headers.get("content-length", 0))
-            block_size = 8192 * 2
-            pbar.total = total_size
-            while True:
-                buffer = response.read(block_size)
-                if not buffer:
-                    break
-                f.write(buffer)
-                pbar.update(len(buffer))
+        with urllib.request.urlopen(src_url) as response:
+            length = response.headers.get("content-length")
+            total = int(length) if length is not None else None
+            with open(dst_path, "wb") as f, tqdm(
+                total=total, unit="B", unit_scale=True, desc=desc, disable=not show_progress
+            ) as pbar:
+                while True:
+                    buffer = response.read(8192 * 2)
+                    if not buffer:
+                        break
+                    f.write(buffer)
+                    pbar.update(len(buffer))
+                if total is not None and f.tell() != total:
+                    raise OSError(f"Incomplete download of {src_url}: expected {total} bytes, got {f.tell()}")
 
-        pbar.close()
 
     def download_multipart_release(dataset_url, dst_path):
         part_paths = []
@@ -208,13 +204,16 @@ def download_dataset(
                 part_path.unlink()
 
     if not save_zip_path.exists() or redownload:
-        try:
-            download_file(url, save_zip_path, f"Downloading {dataset}")
-        except urllib.error.HTTPError as exc:
-            if exc.code == 404:
-                download_multipart_release(url, save_zip_path)
-            else:
-                raise
+        # Stage all parts on the same filesystem so readers only see complete archives.
+        with TemporaryDirectory(dir=save_zip_path.parent) as staging:
+            pending = Path(staging) / save_zip_path.name
+            try:
+                download_file(url, pending, f"Downloading {dataset}")
+            except urllib.error.HTTPError as exc:
+                if exc.code != 404:
+                    raise
+                download_multipart_release(url, pending)
+            pending.replace(save_zip_path)
 
     # now that we have the zip file, extract it
     if unzip:
