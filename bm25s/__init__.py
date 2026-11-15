@@ -238,7 +238,7 @@ class BM25:
                 "scipy is not installed. Please install scipy to use the scipy csc_backend."
             )
         
-        NUMBA_IS_DISABLED = os.environ.get("NUMBA_DISABLE_JIT") in [None, False]
+        NUMBA_IS_DISABLED = os.environ.get("NUMBA_DISABLE_JIT") is not None
         if auto_compile and self.backend == "numba" and not NUMBA_IS_DISABLED:
             # by default, we don't want to warm up the Numba functions
             self.compile(activate_numba=True, warmup=False)
