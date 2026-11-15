@@ -11,6 +11,41 @@ import numpy as np
 from bm25s.tokenization import Tokenizer
 
 class TestTokenizer(unittest.TestCase):
+
+    def test_default_splitter_keeps_arabic_words_with_diacritics(self):
+        tokenizer = Tokenizer(stopwords=None)
+        tokens = tokenizer.tokenize(
+            ["كَتَبَ الطالب الدرس"], return_as="string", show_progress=False
+        )
+        self.assertEqual(tokens, [["كَتَبَ", "الطالب", "الدرس"]])
+
+    def test_default_splitters_preserve_decomposed_latin_and_marks(self):
+        from bm25s.tokenization import tokenize as functional_tokenize
+
+        text = "cafe\u0301 cafe! x a\u0301b"
+        expected = ["cafe\u0301", "cafe", "a\u0301b"]
+        self.assertEqual(
+            Tokenizer(stopwords=None).tokenize(
+                [text], return_as="string", show_progress=False
+            )[0], expected
+        )
+        self.assertEqual(
+            functional_tokenize(text, stopwords=None, return_ids=False, show_progress=False),
+            [expected],
+        )
+
+    def test_arabic_range_excludes_non_mark_symbols_and_custom_splitters(self):
+        tokenizer = Tokenizer(stopwords=None)
+        tokens = tokenizer.tokenize(
+            ["بيت\u06dd نور\u06d6"], return_as="string", show_progress=False
+        )[0]
+        self.assertEqual(tokens, ["بيت", "نور\u06d6"])
+        custom = Tokenizer(splitter=r"\w+", stopwords=None)
+        self.assertEqual(
+            custom.tokenize(["a-b"], return_as="string", show_progress=False)[0],
+            ["a", "b"],
+        )
+
     @classmethod
     def setUpClass(cls):
         # Define a sample corpus

@@ -150,7 +150,7 @@ class Tokenizer:
     def __init__(
         self,
         lower: bool = True,
-        splitter: Union[str, Callable] = r"(?u)\b\w\w+\b",
+        splitter: Union[str, Callable] = r"(?u)\b\w[\w\u0300-\u036f\u064b-\u065f\u0670\u06d6-\u06dc\u06df-\u06e4\u06e7-\u06e8\u06ea-\u06ed]+(?!\w)",
         stopwords: Union[str, List[str]] = "english",
         stemmer: Callable = None,  # type: ignore
     ):
@@ -569,7 +569,7 @@ def _infer_stopwords(stopwords: Union[str, List[str]]) -> Union[List[str], tuple
 def tokenize(
     texts: Union[str, List[str]],
     lower: bool = True,
-    token_pattern: str = r"(?u)\b\w\w+\b",
+    token_pattern: str = r"(?u)\b\w[\w\u0300-\u036f\u064b-\u065f\u0670\u06d6-\u06dc\u06df-\u06e4\u06e7-\u06e8\u06ea-\u06ed]+(?!\w)",
     stopwords: Union[str, List[str]] = "english",
     stemmer: Callable = None,  # type: ignore
     return_ids: bool = True,
