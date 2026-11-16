@@ -148,11 +148,13 @@ def download_dataset(
     save_zip_path.parent.mkdir(parents=True, exist_ok=True)
 
     def download_file(src_url, dst_path, desc):
+        """Download to the staging path and reject truncated HTTP transfers."""
         with urllib.request.urlopen(src_url) as response:
             length = response.headers.get("content-length")
             total = int(length) if length is not None else None
             with open(dst_path, "wb") as f, tqdm(
-                total=total, unit="B", unit_scale=True, desc=desc, disable=not show_progress
+                total=total, unit="B", unit_scale=True, desc=desc,
+                leave=leave_progress, disable=not show_progress,
             ) as pbar:
                 while True:
                     buffer = response.read(8192 * 2)
