@@ -27,6 +27,20 @@ class TestDatasetDownload(unittest.TestCase):
                 "toy", save_dir=self.root, unzip=False, show_progress=False, **kwargs
             )
 
+    def test_download_progress_respects_leave_setting(self):
+        """Both progress-bar modes should honor the caller's leave setting."""
+        for keep_progress in (False, True):
+            with self.subTest(leave_progress=keep_progress):
+                with patch("urllib.request.urlopen", return_value=Response(b"complete")):
+                    with patch("tqdm.auto.tqdm") as progress:
+                        path = download_dataset(
+                            "toy", save_dir=self.root, unzip=False, redownload=True,
+                            show_progress=True, leave_progress=keep_progress,
+                        )
+                self.assertEqual(path.read_bytes(), b"complete")
+                self.assertEqual(progress.call_args.kwargs["leave"], keep_progress)
+                self.assertIs(progress.call_args.kwargs["disable"], False)
+
     def test_failed_download_can_be_retried(self):
         with self.assertRaises(OSError):
             self.download([OSError("connection lost")])
