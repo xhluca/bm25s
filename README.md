@@ -438,6 +438,8 @@ You can find advanced examples in [examples/tokenizer_class.py](examples/tokeniz
 * Use the tokenizer in generator mode to save memory by `yield`ing one document at a time.
 * Pass different outputs of the tokenizer to the `BM25.retrieve` function.
 
+If you index the token IDs returned by `tokenizer.tokenize`, query with token IDs, a `Tokenized` object, or an `(ids, vocab)` tuple from the same tokenizer. String queries raise a `ValueError` on such an index.
+
 
 
 ## Variants

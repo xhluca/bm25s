@@ -7,6 +7,7 @@ import tempfile
 
 import numpy as np
 import bm25s
+from bm25s.tokenization import Tokenizer
 import Stemmer  # optional: for stemming
 
 class TestNumbaBackendRetrieve(unittest.TestCase):
@@ -214,3 +215,36 @@ class TestNumbaBackendRetrieve(unittest.TestCase):
     def tearDownClass(cls):
         # remove the temp dir with rmtree
         shutil.rmtree(cls.tmpdirname)
+
+
+class TestNumbaRetrieveFromTokenIdsIndex(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        corpus = [
+            "a cat is a feline and likes to purr",
+            "a dog is the human's best friend and loves to play",
+            "a bird is a beautiful animal that can fly",
+            "a fish is a creature that lives in water and swims",
+        ]
+        cls.tokenizer = Tokenizer(stopwords="en", stemmer=Stemmer.Stemmer("english"))
+        corpus_ids = cls.tokenizer.tokenize(corpus, show_progress=False)
+        cls.query_ids = cls.tokenizer.tokenize(
+            ["does the cat purr"], update_vocab=False, show_progress=False
+        )
+
+        cls.retriever = bm25s.BM25(backend="numba")
+        cls.retriever.index(corpus_ids, show_progress=False)
+
+    def test_retrieve_with_tokenized_matches_ids(self):
+        expected = self.retriever.retrieve(self.query_ids, k=1, show_progress=False)
+        results = self.retriever.retrieve(
+            self.tokenizer.to_tokenized_tuple(self.query_ids), k=1, show_progress=False
+        )
+        np.testing.assert_array_equal(results.documents, expected.documents)
+        np.testing.assert_allclose(results.scores, expected.scores, rtol=1e-6)
+
+    def test_retrieve_with_strings_raises(self):
+        with self.assertRaises(ValueError):
+            self.retriever.retrieve(
+                self.tokenizer.decode(self.query_ids), k=1, show_progress=False
+            )

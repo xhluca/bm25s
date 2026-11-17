@@ -569,11 +569,22 @@ class BM25:
         # we create unique token IDs from the vocab_dict for faster lookup
         self.unique_token_ids_set = set(self.vocab_dict.values())
 
+    def _is_indexed_from_token_ids(self):
+        return isinstance(next(iter(self.vocab_dict), None), int)
+
     def get_tokens_ids(self, query_tokens: List[str]) -> List[int]:
         """
         For a given list of tokens, return the list of token IDs, leaving out tokens
         that are not in the vocabulary.
+
+        Raises a ValueError if the index was built from token IDs, since string tokens
+        cannot be matched against it.
         """
+        if self._is_indexed_from_token_ids():
+            raise ValueError(
+                "This index was built from token IDs, so string tokens cannot be matched against it. "
+                "Pass token IDs, a Tokenized object, or an (ids, vocab) tuple instead."
+            )
         return [
             self.vocab_dict[token] for token in query_tokens if token in self.vocab_dict
         ]
@@ -694,7 +705,9 @@ class BM25:
         ----------
         query_tokens : List[List[str]] or bm25s.tokenization.Tokenized
             List of list of tokens for each query. If a Tokenized object is provided,
-            it will be converted to a list of list of tokens.
+            it will be converted to a list of list of tokens, unless the index was built
+            from token IDs: then its IDs are used directly and must come from the tokenizer
+            that built the index. String tokens cannot be used with an index built from token IDs.
 
         corpus : List[Any] or np.ndarray
             List or array aligned with the indexed documents. If provided, the function
@@ -773,6 +786,35 @@ class BM25:
         if n_threads == -1:
             n_threads = os.cpu_count()
 
+        if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(
+            query_tokens
+        ):
+            if len(query_tokens) != 2:
+                msg = (
+                    "Expected a list of string or a tuple of two elements: the first element is the "
+                    "list of unique token IDs, "
+                    "and the second element is the list of token IDs for each document."
+                    f"Found {len(query_tokens)} elements instead."
+                )
+                raise ValueError(msg)
+            else:
+                ids, vocab = query_tokens
+                if not isinstance(ids, Iterable):
+                    raise ValueError(
+                        "The first element of the tuple passed to retrieve must be an iterable."
+                    )
+                if not isinstance(vocab, dict):
+                    raise ValueError(
+                        "The second element of the tuple passed to retrieve must be a dictionary."
+                    )
+                query_tokens = tokenization.Tokenized(ids=ids, vocab=vocab)
+
+        if isinstance(query_tokens, tokenization.Tokenized):
+            if self._is_indexed_from_token_ids():
+                query_tokens = query_tokens.ids
+            else:
+                query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
+
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
         if is_list_of_list_of_type(query_tokens, type_=int):
             if not hasattr(self, "unique_token_ids_set") or self.unique_token_ids_set is None:
@@ -801,32 +843,6 @@ class BM25:
                 query_tokens_filtered.append(query_filtered)
 
             query_tokens = query_tokens_filtered
-
-        if isinstance(query_tokens, tuple) and not _is_tuple_of_list_of_tokens(
-            query_tokens
-        ):
-            if len(query_tokens) != 2:
-                msg = (
-                    "Expected a list of string or a tuple of two elements: the first element is the "
-                    "list of unique token IDs, "
-                    "and the second element is the list of token IDs for each document."
-                    f"Found {len(query_tokens)} elements instead."
-                )
-                raise ValueError(msg)
-            else:
-                ids, vocab = query_tokens
-                if not isinstance(ids, Iterable):
-                    raise ValueError(
-                        "The first element of the tuple passed to retrieve must be an iterable."
-                    )
-                if not isinstance(vocab, dict):
-                    raise ValueError(
-                        "The second element of the tuple passed to retrieve must be a dictionary."
-                    )
-                query_tokens = tokenization.Tokenized(ids=ids, vocab=vocab)
-
-        if isinstance(query_tokens, tokenization.Tokenized):
-            query_tokens = tokenization.convert_tokenized_to_string_list(query_tokens)
 
         corpus = corpus if corpus is not None else self.corpus
 
@@ -1030,9 +1046,13 @@ class BM25:
 
         # Save the vocab dictionary
         vocab_path = save_dir / vocab_name
+        indexed_from_token_ids = self._is_indexed_from_token_ids()
+        vocab_dict = self.vocab_dict
+        if indexed_from_token_ids:
+            vocab_dict = {str(token_id): i for token_id, i in vocab_dict.items()}
 
         with open(vocab_path, "wt", encoding="utf-8") as f:
-            f.write(json_functions.dumps(self.vocab_dict, ensure_ascii=False))
+            f.write(json_functions.dumps(vocab_dict, ensure_ascii=False))
 
         # Save the parameters
         params_path = save_dir / params_name
@@ -1047,6 +1067,7 @@ class BM25:
             num_docs=self.scores["num_docs"],
             version=__version__,
             backend=self.backend,
+            indexed_from_token_ids=indexed_from_token_ids,
         )
         with open(params_path, "w") as f:
             json.dump(params, f, indent=4)
@@ -1259,6 +1280,8 @@ class BM25:
 
         original_version = params.pop("version", None)
         num_docs = params.pop("num_docs", None)
+        if params.pop("indexed_from_token_ids", False):
+            vocab_dict = {int(token_id): i for token_id, i in vocab_dict.items()}
 
         bm25_obj = cls(**params)
         bm25_obj.vocab_dict = vocab_dict
