@@ -391,6 +391,23 @@ class TestTerminalCLIEdgeCases(unittest.TestCase):
         
         self.assertEqual(context.exception.code, 1)
 
+    def test_empty_csv_file(self):
+        """Test handling of empty CSV input file."""
+        empty_file = os.path.join(self.tmpdirname, "empty.csv")
+        with open(empty_file, "w", encoding="utf-8") as f:
+            f.write("")
+
+        args = Namespace(
+            file=empty_file,
+            output=self.index_dir,
+            column=None
+        )
+
+        with self.assertRaises(SystemExit) as context:
+            index_command(args)
+
+        self.assertEqual(context.exception.code, 1)
+
     def test_long_document_truncation(self):
         """Test that long documents are truncated in search output."""
         # Create a file with a very long document

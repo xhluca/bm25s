@@ -239,7 +239,7 @@ def load(path, document_column=None):
                 if reader.fieldnames:
                     document_column = reader.fieldnames[0]
                 else:
-                    return BM25Search(corpus=[])
+                    return documents
 
             for row in reader:
                 if document_column in row:
