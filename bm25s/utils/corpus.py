@@ -24,6 +24,23 @@ except ImportError:
 
 from . import json_functions
 
+
+def _reshape_corpus_results(results, shape):
+    """Keep sequence entries intact without changing scalar dtype inference."""
+    try:
+        array = np.array(results)
+    except ValueError:
+        # Ragged entries cannot be converted to a regular NumPy array.
+        array = None
+
+    if array is None or array.ndim != 1:
+        array = np.empty(len(results), dtype=object)
+        for i, result in enumerate(results):
+            array[i] = result
+
+    return array.reshape(shape)
+
+
 def change_extension(path, new_extension):
     """Replace the final filename extension, or append one if it has none."""
     path = str(path)
@@ -185,7 +202,7 @@ class JsonlCorpus:
             # was a list, and then reshape it back to the original shape
             index_flat = index.flatten().tolist()
             results = [self.__getitem__(i) for i in index_flat]
-            reshaped = np.array(results).reshape(index.shape)
+            reshaped = _reshape_corpus_results(results, index.shape)
             return reshaped
         
         raise TypeError("Invalid index type")

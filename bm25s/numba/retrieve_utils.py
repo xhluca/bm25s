@@ -155,7 +155,7 @@ def _retrieve_numba_functional(
         else:
             index_flat = retrieved_indices.flatten().tolist()
             results = [corpus[i] for i in index_flat]
-            retrieved_docs = np.array(results).reshape(retrieved_indices.shape)
+            retrieved_docs = utils.corpus._reshape_corpus_results(results, retrieved_indices.shape)
 
     if return_as == "tuple":
         return retrieved_docs, retrieved_scores
