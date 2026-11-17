@@ -228,6 +228,28 @@ class TestRetrieveFromTokenIdsIndex(unittest.TestCase):
                 np.testing.assert_array_equal(results.documents, self.expected.documents)
                 np.testing.assert_allclose(results.scores, self.expected.scores, rtol=1e-6)
 
+    def test_retrieve_each_id_query_format_after_reload(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            self.retriever.save(tmpdirname)
+            reloaded = bm25s.BM25.load(tmpdirname)
+
+        query_formats = {
+            "ids": self.query_ids,
+            "Tokenized": self.tokenizer.to_tokenized_tuple(self.query_ids),
+            "(ids, vocab)": (self.query_ids, self.tokenizer.get_vocab_dict()),
+            "(ids, empty vocab)": (self.query_ids, {}),
+        }
+        for name, query in query_formats.items():
+            with self.subTest(query_format=name):
+                results = reloaded.retrieve(query, k=1, show_progress=False)
+                np.testing.assert_array_equal(results.documents, self.expected.documents)
+                np.testing.assert_allclose(results.scores, self.expected.scores, rtol=1e-6)
+
+        with self.assertRaises(ValueError):
+            reloaded.retrieve(
+                self.tokenizer.decode(self.query_ids), k=1, show_progress=False
+            )
+
     def test_retrieve_with_strings_raises(self):
         with self.assertRaises(ValueError):
             self.retriever.retrieve(

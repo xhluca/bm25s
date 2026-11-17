@@ -576,6 +576,9 @@ class BM25:
         """
         For a given list of tokens, return the list of token IDs, leaving out tokens
         that are not in the vocabulary.
+
+        Raises a ValueError if the index was built from token IDs, since string tokens
+        cannot be matched against it.
         """
         if self._is_indexed_from_token_ids():
             raise ValueError(
@@ -1043,9 +1046,13 @@ class BM25:
 
         # Save the vocab dictionary
         vocab_path = save_dir / vocab_name
+        indexed_from_token_ids = self._is_indexed_from_token_ids()
+        vocab_dict = self.vocab_dict
+        if indexed_from_token_ids:
+            vocab_dict = {str(token_id): i for token_id, i in vocab_dict.items()}
 
         with open(vocab_path, "wt", encoding="utf-8") as f:
-            f.write(json_functions.dumps(self.vocab_dict, ensure_ascii=False))
+            f.write(json_functions.dumps(vocab_dict, ensure_ascii=False))
 
         # Save the parameters
         params_path = save_dir / params_name
@@ -1060,6 +1067,7 @@ class BM25:
             num_docs=self.scores["num_docs"],
             version=__version__,
             backend=self.backend,
+            indexed_from_token_ids=indexed_from_token_ids,
         )
         with open(params_path, "w") as f:
             json.dump(params, f, indent=4)
@@ -1272,6 +1280,8 @@ class BM25:
 
         original_version = params.pop("version", None)
         num_docs = params.pop("num_docs", None)
+        if params.pop("indexed_from_token_ids", False):
+            vocab_dict = {int(token_id): i for token_id, i in vocab_dict.items()}
 
         bm25_obj = cls(**params)
         bm25_obj.vocab_dict = vocab_dict
