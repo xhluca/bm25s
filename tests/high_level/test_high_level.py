@@ -103,6 +103,12 @@ class TestHighLevel(unittest.TestCase):
         corpus = bm25_hl.load(empty_csv_path)
         self.assertEqual(corpus, [])
 
+        with open(empty_csv_path, "w", encoding="utf-8") as f:
+            f.write("\n\n")
+
+        corpus = bm25_hl.load(empty_csv_path)
+        self.assertEqual(corpus, [])
+
     def test_k_larger_than_corpus(self):
         corpus = bm25_hl.load(self.txt_path)
         retriever = bm25_hl.index(corpus)
