@@ -212,6 +212,45 @@ class TestTokenizer(unittest.TestCase):
         # Check if the stopwords are loaded correctly
         self.assertEqual(stopwords, tuple(tokenizer2.stopwords))
 
+    def test_loaded_stopwords_filter_cached_words(self):
+        tokenizer = Tokenizer(stopwords=[])
+        original_ids = tokenizer.tokenize(["cats dogs"], show_progress=False)
+        original_vocab = dict(tokenizer.get_vocab_dict())
+
+        Tokenizer(stopwords=["cats"]).save_stopwords(self.tmpdir)
+        tokenizer.load_stopwords(self.tmpdir)
+
+        self.assertEqual(
+            tokenizer.tokenize(["cats dogs", "cats"], return_as="string", show_progress=False),
+            [["dogs"], [""]],
+        )
+        stream = tokenizer.streaming_tokenize(
+            ["cats dogs", "cats"], update_vocab=False, allow_empty=False
+        )
+        self.assertEqual(tokenizer.decode(list(stream)), [["dogs"], []])
+        self.assertEqual(tokenizer.get_vocab_dict(), original_vocab)
+        self.assertEqual(tokenizer.decode(original_ids), [["cats", "dogs"]])
+
+    def test_loaded_vocab_respects_stopwords(self):
+        for stemmer, expected in ((None, ["cat", "dogs"]), (self.stemmer, ["cat", "dog"])):
+            tokenizer = Tokenizer(stopwords=[], stemmer=stemmer)
+            tokenizer.tokenize(["cats cat dogs"], show_progress=False)
+            tokenizer.save_vocab(self.tmpdir)
+
+            loaded = Tokenizer(stopwords=["cats"], stemmer=stemmer)
+            loaded.load_vocab(self.tmpdir)
+            original_vocab = dict(loaded.get_vocab_dict())
+            for update_vocab in (False, True, "never", "if_empty"):
+                with self.subTest(stemmer=stemmer, update_vocab=update_vocab):
+                    self.assertEqual(
+                        loaded.tokenize(
+                            ["cats cat dogs"], update_vocab=update_vocab,
+                            return_as="string", show_progress=False,
+                        ),
+                        [expected],
+                    )
+                    self.assertEqual(loaded.get_vocab_dict(), original_vocab)
+
     def test_empty_sentence_and_unknown_word(self):
         corpus = [
             "a cat is a feline and likes to purr",

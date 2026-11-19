@@ -321,12 +321,12 @@ class Tokenizer:
             
             doc_ids = []
             for word in splitted_words:
+                if using_stopwords and word in stopwords_set:
+                    continue
+
                 if word in self.word_to_id:
                     wid = self.word_to_id[word]
                     doc_ids.append(wid)
-                    continue
-
-                if using_stopwords and word in stopwords_set:
                     continue
 
                 # We are always updating the word_to_stem mapping since even new
