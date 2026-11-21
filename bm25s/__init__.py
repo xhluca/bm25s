@@ -588,7 +588,10 @@ class BM25:
 
         dtype = np.dtype(self.dtype)
         int_dtype = np.dtype(self.int_dtype)
-        query_tokens_ids: np.ndarray = np.asarray(query_tokens_ids, dtype=int_dtype)
+        query_tokens_ids: np.ndarray = np.asarray(query_tokens_ids)
+
+        if query_tokens_ids.min(initial=0) < 0:
+            raise ValueError("The query token IDs must be non-negative.")
 
         max_token_id = int(query_tokens_ids.max(initial=0))
 
@@ -597,6 +600,9 @@ class BM25:
                 f"The maximum token ID in the query ({max_token_id}) is higher than the number of tokens in the index."
                 "This likely means that the query contains tokens that are not in the index."
             )
+
+        # Validate before narrowing, which can wrap out-of-range IDs to valid ones.
+        query_tokens_ids = query_tokens_ids.astype(int_dtype, copy=False)
 
         scores = self._compute_relevance_from_scores(
             data=data,
