@@ -146,19 +146,27 @@ class TestTokenizationEdgeCases(unittest.TestCase):
 
     def test_tokenize_allow_empty_false(self):
         """Test tokenization with allow_empty=False"""
-        texts = [""]  # Empty string
-        result = bm25s.tokenize(texts, allow_empty=False, return_ids=True)
-        
-        # Should have one token (empty string token)
-        self.assertEqual(len(result.ids[0]), 1)
+        texts = ["", " \t\n", "!!!", "cats dogs"]
+        for return_ids in (True, False):
+            with self.subTest(return_ids=return_ids):
+                result = bm25s.tokenize(
+                    texts, allow_empty=False, return_ids=return_ids, show_progress=False
+                )
+                if return_ids:
+                    result = bm25s.tokenization.convert_tokenized_to_string_list(result)
+                self.assertEqual(result, [[], [], [], ["cats", "dogs"]])
 
     def test_tokenize_allow_empty_true(self):
         """Test tokenization with allow_empty=True"""
-        texts = [""]  # Empty string
-        result = bm25s.tokenize(texts, allow_empty=True, return_ids=True)
-        
-        # Should have empty list
-        self.assertEqual(len(result.ids[0]), 0)
+        texts = ["", " \t\n", "!!!", "cats dogs"]
+        for return_ids in (True, False):
+            with self.subTest(return_ids=return_ids):
+                result = bm25s.tokenize(
+                    texts, allow_empty=True, return_ids=return_ids, show_progress=False
+                )
+                if return_ids:
+                    result = bm25s.tokenization.convert_tokenized_to_string_list(result)
+                self.assertEqual(result, [[""], [""], [""], ["cats", "dogs"]])
 
 
 if __name__ == "__main__":

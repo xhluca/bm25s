@@ -1,9 +1,40 @@
 import unittest
 import numpy as np
+import Stemmer
 import bm25s
 
 
 class TestBM25SAllowEmpty(unittest.TestCase):
+    def test_functional_tokenizer_indexes_blank_documents(self):
+        for return_ids in (True, False):
+            for stemmer in (None, Stemmer.Stemmer("english")):
+                for corpus in (["", " \t\n", "!!!"], ["", "cats", "dogs"]):
+                    with self.subTest(
+                        return_ids=return_ids, stemmer=stemmer, corpus=corpus
+                    ):
+                        tokens = bm25s.tokenize(
+                            corpus,
+                            stemmer=stemmer,
+                            return_ids=return_ids,
+                            show_progress=False,
+                        )
+                        retriever = bm25s.BM25(backend="numpy")
+                        retriever.index(tokens, show_progress=False)
+                        query = bm25s.tokenize(
+                            "cats",
+                            stemmer=stemmer,
+                            return_ids=False,
+                            show_progress=False,
+                        )[0]
+                        scores = retriever.get_scores(query)
+                        self.assertEqual(len(scores), len(corpus))
+                        self.assertEqual(scores[0], 0)
+                        self.assertEqual(scores[2], 0)
+                        if corpus[1] == "cats":
+                            self.assertGreater(scores[1], 0)
+                        else:
+                            self.assertEqual(scores[1], 0)
+
     def test_simple(self):
         all_scores = []
 
