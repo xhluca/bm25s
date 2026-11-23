@@ -654,7 +654,7 @@ def tokenize(
 
         splitted = split_fn(text)
 
-        if allow_empty is False and len(splitted) == 0:
+        if allow_empty is True and len(splitted) == 0:
             splitted = [""]
         
         doc_ids = []
