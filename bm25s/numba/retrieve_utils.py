@@ -1,4 +1,3 @@
-import os
 from numba import njit, prange
 import numpy as np
 from typing import List, Tuple, Any
@@ -83,7 +82,7 @@ def _retrieve_numba_functional(
     int_dtype="int32",
     weight_mask=None,
 ):
-    from numba import get_num_threads, set_num_threads
+    from numba import config, get_num_threads, set_num_threads
 
 
     if backend_selection != "numba":
@@ -105,7 +104,7 @@ def _retrieve_numba_functional(
         pass
 
     if n_threads == -1:
-        n_threads = os.cpu_count()
+        n_threads = config.NUMBA_NUM_THREADS
     elif n_threads == 0:
         n_threads = 1
 
@@ -117,32 +116,32 @@ def _retrieve_numba_functional(
         og_n_threads = get_num_threads()
         set_num_threads(n_threads)
 
-    # use serial execution when n_threads is one, since we didn't set set_num_threads.
-    retrieve_internal = _retrieve_internal_jitted_serial if n_threads == 1 else _retrieve_internal_jitted_parallel
+    try:
+        # use serial execution when n_threads is one, since we didn't set set_num_threads.
+        retrieve_internal = _retrieve_internal_jitted_serial if n_threads == 1 else _retrieve_internal_jitted_parallel
 
-    # convert query_tokens_ids from list of list to a flat 1-d np.ndarray with
-    # pointers to the start of each query to be used to find the boundaries of each query
-    query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=int_dtype)
-    query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(int_dtype)
+        # convert query_tokens_ids from list of list to a flat 1-d np.ndarray with
+        # pointers to the start of each query to be used to find the boundaries of each query
+        query_pointers = np.cumsum([0] + [len(q) for q in query_tokens_ids], dtype=int_dtype)
+        query_tokens_ids_flat = np.concatenate(query_tokens_ids).astype(int_dtype)
 
-    retrieved_scores, retrieved_indices = retrieve_internal(
-        query_pointers=query_pointers,
-        query_tokens_ids_flat=query_tokens_ids_flat,
-        k=k,
-        sorted=sorted,
-        dtype=np.dtype(dtype),
-        int_dtype=np.dtype(int_dtype),
-        data=scores["data"],
-        indptr=scores["indptr"],
-        indices=scores["indices"],
-        num_docs=scores["num_docs"],
-        nonoccurrence_array=nonoccurrence_array,
-        weight_mask=weight_mask,
-    )
-
-    # reset the number of threads
-    if og_n_threads is not None:
-        set_num_threads(og_n_threads)
+        retrieved_scores, retrieved_indices = retrieve_internal(
+            query_pointers=query_pointers,
+            query_tokens_ids_flat=query_tokens_ids_flat,
+            k=k,
+            sorted=sorted,
+            dtype=np.dtype(dtype),
+            int_dtype=np.dtype(int_dtype),
+            data=scores["data"],
+            indptr=scores["indptr"],
+            indices=scores["indices"],
+            num_docs=scores["num_docs"],
+            nonoccurrence_array=nonoccurrence_array,
+            weight_mask=weight_mask,
+        )
+    finally:
+        if og_n_threads is not None:
+            set_num_threads(og_n_threads)
 
     if corpus is None:
         retrieved_docs = retrieved_indices

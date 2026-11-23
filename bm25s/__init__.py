@@ -728,7 +728,8 @@ class BM25:
             If True, the progress bars will remain after the function completes.
 
         n_threads : int
-            Number of jobs to run in parallel. If -1, it will use all available CPUs.
+            Number of jobs to run in parallel. If -1, it will use all available CPUs,
+            or Numba's configured thread pool when using the numba backend.
             If 0, it will run the jobs sequentially, without using multiprocessing.
 
         chunksize : int
@@ -770,7 +771,7 @@ class BM25:
         else:
             pass
 
-        if n_threads == -1:
+        if n_threads == -1 and self.backend != "numba":
             n_threads = os.cpu_count()
 
         # if it's a list of list of tokens ids (int), we remove any integer not in the vocab_dict
