@@ -47,13 +47,18 @@ class Timer:
         return name
 
     def stop(self, name, show=False, n_total=None):
-        if name not in self.results:
+        if not self.has_started(name):
             raise ValueError(f"Timer with name {name} not started.")
+        if self.has_stopped(name):
+            raise ValueError(f"Timer with name {name} already stopped.")
 
         stop_time = time.monotonic()
         r = self.results[name]
+        if not self.is_paused(name):
+            r["elapsed"] += stop_time - r.pop("last")
+        r.pop("paused", None)
+        r.pop("resumed", None)
         r["stopped"] = stop_time
-        r["elapsed"] += stop_time - r.pop("last")
 
         if show:
             self.show(name, n_total=n_total)
@@ -61,28 +66,32 @@ class Timer:
         return self.results[name]["elapsed"]
 
     def pause(self, name):
-        # if self.has_stopped(name):
-        #     raise ValueError(f"Timer with name {name} already stopped.")
-
-        # if not self.has_started(name):
-        #     raise ValueError(f"Timer with name {name} not started.")
+        if not self.has_started(name):
+            raise ValueError(f"Timer with name {name} not started.")
+        if self.has_stopped(name):
+            raise ValueError(f"Timer with name {name} already stopped.")
+        if self.is_paused(name):
+            raise ValueError(f"Timer with name {name} already paused.")
 
         paused_time = time.monotonic()
         r = self.results[name]
-
-        r["elapsed"] += paused_time - r["last"]
+        r["elapsed"] += paused_time - r.pop("last")
+        r.pop("resumed", None)
+        r["paused"] = paused_time
 
     def resume(self, name):
-        # if not self.has_started(name):
-        #     raise ValueError(f"Timer with name {name} not started.")
+        if not self.has_started(name):
+            raise ValueError(f"Timer with name {name} not started.")
+        if self.has_stopped(name):
+            raise ValueError(f"Timer with name {name} already stopped.")
+        if not self.is_paused(name):
+            raise ValueError(f"Timer with name {name} not paused.")
 
-        # if not self.is_paused(name):
-        #     raise ValueError(f"Timer with name {name} not paused.")
-
-        # if self.has_stopped(name):
-        #     raise ValueError(f"Timer with name {name} already stopped.")
-
-        self.results[name]["last"] = time.monotonic()
+        resumed_time = time.monotonic()
+        r = self.results[name]
+        r.pop("paused")
+        r["resumed"] = resumed_time
+        r["last"] = resumed_time
 
     def is_paused(self, name):
         return name in self.results and "paused" in self.results[name]
